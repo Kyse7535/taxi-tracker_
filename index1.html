@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaxiTracker - Suivi Intelligent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="/manifest.json" />
+    <link
+      rel="manifest"
+      href="data:application/json;base64,eyJuYW1lIjoiVGF4aVRyYWNrZXIiLCJzaG9ydF9uYW1lIjoiVGF4aVRyYWNrZXIiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFmMjkzNyIsInRoZW1lX2NvbG9yIjoiIzM5OGVmNCIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlOVEV5SWlCb1pXbG5hSFE5SWpVeE1pSWdkbWxsZDBKdmVEMGlNQ0F3SURVM01pQTFNVElpSUdacGJHdzlJaU16T1RobFpqUWlQanh5WldOMElIZzlJakV3TUNJZ2VUMGlNVEF3SWlCM2FXUjBhRDBpTXpFeUlpQm9aV2xuYUhROUlqTXhNaUlnY25nOUlqRTJJaUJtYVd4c1BTSWpabVptSWk4K1BDOXpkbWMrIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3N2Zyt4bWwifV19"
+    />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+      }
+
+      .gradient-bg {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+
+      .glass {
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .pulse-dot {
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .camera-preview {
+        aspect-ratio: 4/3;
+        background: #1f2937;
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .skeleton-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+      }
+    </style>
+  </head>
+
+  <body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg p-4 shadow-lg">
+      <div class="flex items-center justify-between max-w-md mx-auto">
+        <div class="flex items-center space-x-3">
+          <div
+            class="w-10 h-10 bg-white rounded-lg flex items-center justify-center"
+          >
+            <span class="text-2xl">🚖</span>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold">TaxiTracker</h1>
+            <p class="text-sm opacity-80">Chauffeur: Mbemba Jean</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="pulse-dot w-3 h-3 bg-green-400 rounded-full"></div>
+          <span class="text-sm">En ligne</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-md mx-auto p-4 space-y-6">
+      <!-- Status Card -->
+      <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Statut Actuel</h2>
+          <span
+            id="status-badge"
+            class="px-3 py-1 bg-yellow-500 text-black rounded-full text-sm font-medium"
+            >Libre</span
+          >
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-center">
+          <div>
+            <p class="text-2xl font-bold text-blue-400" id="daily-earnings">
+              12,500
+            </p>
+            <p class="text-sm text-gray-400">FCFA aujourd'hui</p>
+          </div>
+          <div>
+            <p class="text-2xl font-bold text-green-400" id="trip-count">8</p>
+            <p class="text-sm text-gray-400">Courses</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-3">
+        <button
+          id="start-day-btn"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg"
+        >
+          ▶️ Démarrer la journée
+        </button>
+
+        <button
+          id="declare-trip-btn"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg opacity-50 cursor-not-allowed"
+          disabled
+        >
+          ➕ Déclarer une course
+        </button>
+
+        <button
+          id="pause-btn"
+          class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg opacity-50 cursor-not-allowed"
+          disabled
+        >
+          ⏸️ Pause
+        </button>
+      </div>
+
+      <!-- Trip Declaration Modal -->
+      <div
+        id="trip-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm">
+          <h3 class="text-xl font-bold mb-4">Déclarer une course</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2"
+                >Montant (FCFA)</label
+              >
+              <input
+                type="number"
+                id="trip-amount"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                placeholder="ex: 1500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2"
+                >Nombre de passagers</label
+              >
+              <select
+                id="passenger-count"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+              >
+                <option value="1">1 passager</option>
+                <option value="2">2 passagers</option>
+                <option value="3">3 passagers</option>
+                <option value="4">4 passagers</option>
+              </select>
+            </div>
+            <div class="flex space-x-3">
+              <button
+                id="cancel-trip"
+                class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                id="start-trip"
+                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Démarrer course
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Verification Modal -->
+      <div
+        id="camera-modal"
+        class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm">
+          <h3 class="text-xl font-bold mb-4 text-center">📸 Vérification IA</h3>
+          <div class="camera-preview mb-4">
+            <video
+              id="camera-feed"
+              class="w-full h-full object-cover rounded-lg"
+              autoplay
+              muted
+            ></video>
+            <div class="skeleton-overlay hidden" id="skeleton-overlay">
+              <div class="flex items-center justify-center h-full">
+                <div class="text-center">
+                  <div class="w-16 h-16 mx-auto mb-2">
+                    <!-- Skeleton figure -->
+                    <svg
+                      viewBox="0 0 100 100"
+                      class="w-full h-full text-blue-400"
+                    >
+                      <circle cx="50" cy="20" r="8" fill="currentColor" />
+                      <line
+                        x1="50"
+                        y1="28"
+                        x2="50"
+                        y2="70"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="35"
+                        y1="40"
+                        x2="65"
+                        y2="40"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="50"
+                        y1="70"
+                        x2="35"
+                        y2="90"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="50"
+                        y1="70"
+                        x2="65"
+                        y2="90"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                    </svg>
+                  </div>
+                  <p class="text-sm text-blue-400">Analyse en cours...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="text-center">
+            <p id="verification-message" class="text-lg font-medium mb-2">
+              Vérification dans <span id="countdown">5</span>s...
+            </p>
+            <p class="text-sm text-gray-400">
+              Positionnez-vous bien dans le cadre
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Result Modal -->
+      <div
+        id="result-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center">
+          <div id="result-icon" class="text-6xl mb-4">✅</div>
+          <h3 id="result-title" class="text-xl font-bold mb-2">
+            Vérification réussie
+          </h3>
+          <p id="result-message" class="text-gray-400 mb-4">
+            2 passagers détectés - Conforme à la déclaration
+          </p>
+          <button
+            id="close-result"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+          >
+            Continuer
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Trip Card -->
+      <div
+        id="current-trip"
+        class="bg-gray-800 rounded-xl p-6 shadow-lg hidden"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">Course en cours</h3>
+          <span
+            class="px-3 py-1 bg-green-500 text-white rounded-full text-sm font-medium"
+            >Active</span
+          >
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-gray-400">Montant</p>
+            <p class="text-lg font-bold text-green-400" id="current-amount">
+              -
+            </p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-400">Passagers</p>
+            <p class="text-lg font-bold text-blue-400" id="current-passengers">
+              -
+            </p>
+          </div>
+        </div>
+        <div class="mb-4">
+          <p class="text-sm text-gray-400">Durée</p>
+          <p class="text-2xl font-bold text-white" id="trip-duration">00:00</p>
+        </div>
+        <button
+          id="end-trip-btn"
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+        >
+          Terminer la course
+        </button>
+      </div>
+
+      <!-- Zone Status -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">📍</span>
+            <div>
+              <p class="font-medium">Zone Pointe-Noire</p>
+              <p class="text-sm text-green-400">Dans la zone autorisée</p>
+            </div>
+          </div>
+          <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Score de confiance -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-medium">Score de confiance</span>
+          <span class="text-green-400 font-bold">94%</span>
+        </div>
+        <div class="w-full bg-gray-700 rounded-full h-2">
+          <div class="bg-green-400 h-2 rounded-full" style="width: 94%"></div>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">
+          Excellent comportement ce mois-ci
+        </p>
+      </div>
+    </main>
+
+    <script>
+      // App State
+      let appState = {
+        dayStarted: false,
+        currentTrip: null,
+        tripStartTime: null,
+        dailyEarnings: 12500,
+        tripCount: 8,
+        cameraStream: null,
+      };
+
+      // DOM Elements
+      const startDayBtn = document.getElementById("start-day-btn");
+      const declareTripBtn = document.getElementById("declare-trip-btn");
+      const pauseBtn = document.getElementById("pause-btn");
+      const statusBadge = document.getElementById("status-badge");
+      const tripModal = document.getElementById("trip-modal");
+      const cameraModal = document.getElementById("camera-modal");
+      const resultModal = document.getElementById("result-modal");
+      const currentTripCard = document.getElementById("current-trip");
+
+      // Camera permission check
+      async function checkCameraPermission() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          return true;
+        } catch (err) {
+          alert("⚠️ Caméra non autorisée. Contactez votre propriétaire.");
+          return false;
+        }
+      }
+
+      // Start day
+      startDayBtn.addEventListener("click", async () => {
+        const hasCamera = await checkCameraPermission();
+        if (!hasCamera) return;
+
+        appState.dayStarted = true;
+        startDayBtn.textContent = "⏹️ Terminer la journée";
+        startDayBtn.className =
+          "w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg";
+
+        declareTripBtn.disabled = false;
+        declareTripBtn.className =
+          "w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg";
+
+        pauseBtn.disabled = false;
+        pauseBtn.className =
+          "w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg";
+
+        statusBadge.textContent = "En service";
+        statusBadge.className =
+          "px-3 py-1 bg-green-500 text-white rounded-full text-sm font-medium";
+
+        // Start periodic verification when free
+        startPeriodicVerification();
+      });
+
+      // Declare trip
+      declareTripBtn.addEventListener("click", () => {
+        tripModal.classList.remove("hidden");
+        tripModal.classList.add("flex");
+      });
+
+      // Cancel trip declaration
+      document.getElementById("cancel-trip").addEventListener("click", () => {
+        tripModal.classList.add("hidden");
+        tripModal.classList.remove("flex");
+      });
+
+      // Start trip with verification
+      document
+        .getElementById("start-trip")
+        .addEventListener("click", async () => {
+          const amount = document.getElementById("trip-amount").value;
+          const passengers = document.getElementById("passenger-count").value;
+
+          if (!amount) {
+            alert("Veuillez saisir le montant");
+            return;
+          }
+
+          appState.currentTrip = {
+            amount: parseInt(amount),
+            passengers: parseInt(passengers),
+          };
+
+          tripModal.classList.add("hidden");
+          tripModal.classList.remove("flex");
+
+          // Start camera verification
+          await startCameraVerification();
+        });
+
+      // Camera verification
+      async function startCameraVerification() {
+        cameraModal.classList.remove("hidden");
+        cameraModal.classList.add("flex");
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const video = document.getElementById("camera-feed");
+          video.srcObject = stream;
+          appState.cameraStream = stream;
+
+          // Countdown
+          let countdown = 5;
+          const countdownEl = document.getElementById("countdown");
+          const interval = setInterval(() => {
+            countdown--;
+            countdownEl.textContent = countdown;
+            if (countdown <= 0) {
+              clearInterval(interval);
+              captureAndAnalyze();
+            }
+          }, 1000);
+        } catch (err) {
+          alert("Erreur caméra: " + err.message);
+          cameraModal.classList.add("hidden");
+        }
+      }
+
+      // Capture and analyze
+      async function captureAndAnalyze() {
+        document.getElementById("verification-message").textContent =
+          "Analyse en cours...";
+        document.getElementById("skeleton-overlay").classList.remove("hidden");
+
+        // Simulate AI analysis
+        setTimeout(() => {
+          const declaredPassengers = appState.currentTrip.passengers;
+          const detectedPassengers =
+            Math.random() > 0.3 ? declaredPassengers : declaredPassengers + 2; // 70% chance of correct detection
+
+          // Stop camera
+          if (appState.cameraStream) {
+            appState.cameraStream.getTracks().forEach((track) => track.stop());
+          }
+
+          cameraModal.classList.add("hidden");
+          showVerificationResult(declaredPassengers, detectedPassengers);
+        }, 2000);
+      }
+
+      // Show verification result
+      function showVerificationResult(declared, detected) {
+        const resultIcon = document.getElementById("result-icon");
+        const resultTitle = document.getElementById("result-title");
+        const resultMessage = document.getElementById("result-message");
+
+        if (Math.abs(declared - detected) <= 1) {
+          // Success
+          resultIcon.textContent = "✅";
+          resultTitle.textContent = "Vérification réussie";
+          resultMessage.textContent = `${detected} passager(s) détecté(s) - Conforme à la déclaration`;
+
+          // Start trip
+          startTrip();
+        } else {
+          // Alert
+          resultIcon.textContent = "⚠️";
+          resultTitle.textContent = "Écart détecté";
+          resultMessage.textContent = `${detected} passager(s) détecté(s) vs ${declared} déclaré(s) - Alerte envoyée au propriétaire`;
+        }
+
+        resultModal.classList.remove("hidden");
+        resultModal.classList.add("flex");
+      }
+
+      // Close result modal
+      document.getElementById("close-result").addEventListener("click", () => {
+        resultModal.classList.add("hidden");
+        resultModal.classList.remove("flex");
+      });
+
+      // Start trip
+      function startTrip() {
+        appState.tripStartTime = Date.now();
+
+        // Update UI
+        document.getElementById("current-amount").textContent =
+          appState.currentTrip.amount + " FCFA";
+        document.getElementById("current-passengers").textContent =
+          appState.currentTrip.passengers;
+
+        currentTripCard.classList.remove("hidden");
+        statusBadge.textContent = "En course";
+        statusBadge.className =
+          "px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-medium";
+
+        // Start trip timer
+        startTripTimer();
+      }
+
+      // Trip timer
+      function startTripTimer() {
+        const timer = setInterval(() => {
+          if (!appState.tripStartTime) {
+            clearInterval(timer);
+            return;
+          }
+
+          const elapsed = Date.now() - appState.tripStartTime;
+          const minutes = Math.floor(elapsed / 60000);
+          const seconds = Math.floor((elapsed % 60000) / 1000);
+
+          document.getElementById("trip-duration").textContent = `${minutes
+            .toString()
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+        }, 1000);
+      }
+
+      // End trip
+      document.getElementById("end-trip-btn").addEventListener("click", () => {
+        // Update earnings
+        appState.dailyEarnings += appState.currentTrip.amount;
+        appState.tripCount++;
+
+        document.getElementById("daily-earnings").textContent =
+          appState.dailyEarnings.toLocaleString();
+        document.getElementById("trip-count").textContent = appState.tripCount;
+
+        // Reset trip
+        appState.currentTrip = null;
+        appState.tripStartTime = null;
+
+        currentTripCard.classList.add("hidden");
+        statusBadge.textContent = "Libre";
+        statusBadge.className =
+          "px-3 py-1 bg-yellow-500 text-black rounded-full text-sm font-medium";
+
+        // Resume periodic verification
+        startPeriodicVerification();
+      });
+
+      // Periodic verification when free
+      function startPeriodicVerification() {
+        if (!appState.dayStarted || appState.currentTrip) return;
+
+        setTimeout(async () => {
+          if (!appState.dayStarted || appState.currentTrip) return;
+
+          // Silent verification
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+            });
+
+            // Simulate detection
+            setTimeout(() => {
+              const detected = Math.random() > 0.9 ? 2 : 0; // 10% chance of detecting fraud
+
+              if (detected >= 2) {
+                // Show alert
+                alert(
+                  "⚠️ Transport non déclaré détecté - Alerte envoyée au propriétaire"
+                );
+              }
+
+              stream.getTracks().forEach((track) => track.stop());
+              startPeriodicVerification(); // Continue cycle
+            }, 1000);
+          } catch (err) {
+            console.log("Periodic verification failed:", err);
+            startPeriodicVerification(); // Continue cycle
+          }
+        }, 8 * 60 * 1000); // 8 minutes
+      }
+
+      // PWA Installation
+      let deferredPrompt;
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Show install button or banner
+        console.log("PWA installable");
+      });
+
+      // Service Worker Registration
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("./sw.js", { scope: "/" })
+            .then((registration) => {
+              console.log("✅ Service Worker enregistré :", registration);
+            })
+            .catch((error) => {
+              console.error("❌ Échec de l'enregistrement du SW :", error);
+            });
+        });
+      }
+
+      // Initialize app
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("TaxiTracker PWA loaded");
+      });
+    </script>
+    <script>
+      (function () {
+        function c() {
+          var b = a.contentDocument || a.contentWindow.document;
+          if (b) {
+            var d = b.createElement("script");
+            d.innerHTML =
+              "window.__CF$cv$params={r:'97f6398d7458d125',t:'MTc1NzkxOTM5My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";
+            b.getElementsByTagName("head")[0].appendChild(d);
+          }
+        }
+        if (document.body) {
+          var a = document.createElement("iframe");
+          a.height = 1;
+          a.width = 1;
+          a.style.position = "absolute";
+          a.style.top = 0;
+          a.style.left = 0;
+          a.style.border = "none";
+          a.style.visibility = "hidden";
+          document.body.appendChild(a);
+          if ("loading" !== document.readyState) c();
+          else if (window.addEventListener)
+            document.addEventListener("DOMContentLoaded", c);
+          else {
+            var e = document.onreadystatechange || function () {};
+            document.onreadystatechange = function (b) {
+              e(b);
+              "loading" !== document.readyState &&
+                ((document.onreadystatechange = e), c());
+            };
+          }
+        }
+      })();
+    </script>
+    <script>
+      // Config
+      const TRACKING_OPTIONS = {
+        enableHighAccuracy: true,
+        maximumAge: 3000, // reuse cache up to 3s
+        timeout: 10000,
+      };
+      const MIN_DISTANCE_DELTA = 5; // meters, ignore tiny moves to save battery
+
+      // Haversine util
+      function haversine(a, b) {
+        const R = 6371000;
+        const toRad = (d) => (d * Math.PI) / 180;
+        const dLat = toRad(b.lat - a.lat);
+        const dLng = toRad(b.lng - a.lng);
+        const lat1 = toRad(a.lat);
+        const lat2 = toRad(b.lat);
+        const sinDlat = Math.sin(dLat / 2);
+        const sinDlng = Math.sin(dLng / 2);
+        const aa =
+          sinDlat * sinDlat +
+          Math.cos(lat1) * Math.cos(lat2) * sinDlng * sinDlng;
+        const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+        return R * c; // meters
+      }
+
+      // Tracking service
+      let watchId = null;
+      let lastPoint = null;
+
+      function startLocationTracking(onPoint) {
+        if (!("geolocation" in navigator))
+          throw new Error("Geolocation not supported");
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const p = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              ts: pos.timestamp || Date.now(),
+              accuracy: pos.coords.accuracy || 999,
+              speed: pos.coords.speed || null,
+              heading: pos.coords.heading || null,
+            };
+
+            // Filter by accuracy and minimum movement
+            if (p.accuracy > 100) return; // too imprecise
+            if (lastPoint) {
+              const d = haversine(lastPoint, p);
+              if (d < MIN_DISTANCE_DELTA) return;
+              // speed sanity check
+              const dt = (p.ts - lastPoint.ts) / 1000 || 1;
+              const impliedSpeed = d / dt; // m/s
+              if (impliedSpeed > 60) {
+                // >216 km/h improbable for taxi
+                // mark potential spoof / ignore or flag
+                console.warn("Improbable movement detected", impliedSpeed);
+                // still send but tag as suspicious
+                p.suspicious = true;
+              }
+            }
+            lastPoint = p;
+
+            // Hook provided by caller — e.g. buffer + save
+            if (typeof onPoint === "function") onPoint(p);
+          },
+          (err) => console.error("watchPosition error", err),
+          TRACKING_OPTIONS
+        );
+      }
+
+      function stopLocationTracking() {
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        lastPoint = null;
+      }
+    </script>
+  </body>
+</html>

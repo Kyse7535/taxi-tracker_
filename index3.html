@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaxiTracker - Suivi Intelligent</title>
+    <link rel="manifest" href="/manifest.json" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="manifest"
+      href="data:application/json;base64,eyJuYW1lIjoiVGF4aVRyYWNrZXIiLCJzaG9ydF9uYW1lIjoiVGF4aVRyYWNrZXIiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFmMjkzNyIsInRoZW1lX2NvbG9yIjoiIzM5OGVmNCIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlOVEV5SWlCb1pXbG5hSFE5SWpVeE1pSWdkbWxsZDBKdmVEMGlNQ0F3SURVM01pQTFNVElpSUdacGJHdzlJaU16T1RobFpqUWlQanh5WldOMElIZzlJakV3TUNJZ2VUMGlNVEF3SWlCM2FXUjBhRDBpTXpFeUlpQm9aV2xuYUhROUlqTXhNaUlnY25nOUlqRTJJaUJtYVd4c1BTSWpabVptSWk4K1BDOXpkbWMrIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3N2Zyt4bWwifV19"
+    />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        box-sizing: border-box;
+      }
+      .gradient-bg {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+      .glass {
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .pulse-dot {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .camera-preview {
+        aspect-ratio: 4/3;
+        background: #1f2937;
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .skeleton-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+      }
+      .gps-indicator {
+        animation: gps-pulse 1.5s infinite;
+      }
+      @keyframes gps-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg p-4 shadow-lg">
+      <div class="flex items-center justify-between max-w-md mx-auto">
+        <div class="flex items-center space-x-3">
+          <div
+            class="w-10 h-10 bg-white rounded-lg flex items-center justify-center"
+          >
+            <span class="text-2xl">🚖</span>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold">TaxiTracker</h1>
+            <p class="text-sm opacity-80">Chauffeur: Mbemba Jean</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div id="gps-indicator" class="w-3 h-3 bg-red-400 rounded-full"></div>
+          <div class="pulse-dot w-3 h-3 bg-green-400 rounded-full"></div>
+          <span class="text-sm">En ligne</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-md mx-auto p-4 space-y-6">
+      <!-- GPS Status Card -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-medium">📍 Position GPS</span>
+          <span id="gps-status" class="text-red-400 text-sm">Désactivé</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p class="text-gray-400">Précision</p>
+            <p id="gps-accuracy" class="font-bold">-</p>
+          </div>
+          <div>
+            <p class="text-gray-400">Vitesse</p>
+            <p id="gps-speed" class="font-bold">-</p>
+          </div>
+        </div>
+        <div class="mt-2">
+          <p class="text-gray-400 text-xs">
+            Points collectés: <span id="points-count">0</span>
+          </p>
+          <p class="text-gray-400 text-xs">
+            Dernière position: <span id="last-position">-</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Status Card -->
+      <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Statut Actuel</h2>
+          <span
+            id="status-badge"
+            class="px-3 py-1 bg-yellow-500 text-black rounded-full text-sm font-medium"
+            >Libre</span
+          >
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-center">
+          <div>
+            <p class="text-2xl font-bold text-blue-400" id="daily-earnings">
+              12,500
+            </p>
+            <p class="text-sm text-gray-400">FCFA aujourd'hui</p>
+          </div>
+          <div>
+            <p class="text-2xl font-bold text-green-400" id="trip-count">8</p>
+            <p class="text-sm text-gray-400">Courses</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-3">
+        <button
+          id="start-day-btn"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg"
+        >
+          ▶️ Démarrer la journée
+        </button>
+
+        <button
+          id="declare-trip-btn"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg opacity-50 cursor-not-allowed"
+          disabled
+        >
+          ➕ Déclarer une course
+        </button>
+
+        <button
+          id="pause-btn"
+          class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg opacity-50 cursor-not-allowed"
+          disabled
+        >
+          ⏸️ Pause
+        </button>
+      </div>
+
+      <!-- Trip Declaration Modal -->
+      <div
+        id="trip-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm">
+          <h3 class="text-xl font-bold mb-4">Déclarer une course</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2"
+                >Montant (FCFA)</label
+              >
+              <input
+                type="number"
+                id="trip-amount"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                placeholder="ex: 1500"
+              />
+              <div class="mt-1">
+                <p class="text-xs text-blue-400">
+                  Prix estimé:
+                  <span id="estimated-price">Calculé automatiquement</span>
+                </p>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2"
+                >Nombre de passagers</label
+              >
+              <select
+                id="passenger-count"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+              >
+                <option value="1">1 passager</option>
+                <option value="2">2 passagers</option>
+                <option value="3">3 passagers</option>
+                <option value="4">4 passagers</option>
+              </select>
+            </div>
+            <div class="flex space-x-3">
+              <button
+                id="cancel-trip"
+                class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                id="start-trip"
+                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Démarrer course
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Verification Modal -->
+      <div
+        id="camera-modal"
+        class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm">
+          <h3 class="text-xl font-bold mb-4 text-center">📸 Vérification IA</h3>
+          <div class="camera-preview mb-4">
+            <video
+              id="camera-feed"
+              class="w-full h-full object-cover rounded-lg"
+              autoplay
+              muted
+            ></video>
+            <div class="skeleton-overlay hidden" id="skeleton-overlay">
+              <div class="flex items-center justify-center h-full">
+                <div class="text-center">
+                  <div class="w-16 h-16 mx-auto mb-2">
+                    <!-- Skeleton figure -->
+                    <svg
+                      viewBox="0 0 100 100"
+                      class="w-full h-full text-blue-400"
+                    >
+                      <circle cx="50" cy="20" r="8" fill="currentColor" />
+                      <line
+                        x1="50"
+                        y1="28"
+                        x2="50"
+                        y2="70"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="35"
+                        y1="40"
+                        x2="65"
+                        y2="40"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="50"
+                        y1="70"
+                        x2="35"
+                        y2="90"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                      <line
+                        x1="50"
+                        y1="70"
+                        x2="65"
+                        y2="90"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      />
+                    </svg>
+                  </div>
+                  <p class="text-sm text-blue-400">Analyse en cours...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="text-center">
+            <p id="verification-message" class="text-lg font-medium mb-2">
+              Vérification dans <span id="countdown">5</span>s...
+            </p>
+            <p class="text-sm text-gray-400">
+              Positionnez-vous bien dans le cadre
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Result Modal -->
+      <div
+        id="result-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50"
+      >
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm text-center">
+          <div id="result-icon" class="text-6xl mb-4">✅</div>
+          <h3 id="result-title" class="text-xl font-bold mb-2">
+            Vérification réussie
+          </h3>
+          <p id="result-message" class="text-gray-400 mb-4">
+            2 passagers détectés - Conforme à la déclaration
+          </p>
+          <button
+            id="close-result"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+          >
+            Continuer
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Trip Card -->
+      <div
+        id="current-trip"
+        class="bg-gray-800 rounded-xl p-6 shadow-lg hidden"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">Course en cours</h3>
+          <span
+            class="px-3 py-1 bg-green-500 text-white rounded-full text-sm font-medium"
+            >Active</span
+          >
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-gray-400">Montant déclaré</p>
+            <p class="text-lg font-bold text-green-400" id="current-amount">
+              -
+            </p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-400">Distance GPS</p>
+            <p class="text-lg font-bold text-blue-400" id="current-distance">
+              0.0 km
+            </p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-gray-400">Durée</p>
+            <p class="text-xl font-bold text-white" id="trip-duration">00:00</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-400">Prix estimé</p>
+            <p
+              class="text-lg font-bold text-yellow-400"
+              id="estimated-current-price"
+            >
+              -
+            </p>
+          </div>
+        </div>
+        <button
+          id="end-trip-btn"
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+        >
+          Terminer la course
+        </button>
+      </div>
+
+      <!-- Fraud Alerts -->
+      <div id="fraud-alerts" class="space-y-2 hidden">
+        <div class="bg-red-900 border border-red-600 rounded-lg p-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-red-400">⚠️</span>
+            <span class="text-sm font-medium">Alerte Fraude</span>
+          </div>
+          <p id="fraud-message" class="text-xs text-red-300 mt-1">-</p>
+        </div>
+      </div>
+
+      <!-- Zone Status -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">📍</span>
+            <div>
+              <p class="font-medium">Zone Pointe-Noire</p>
+              <p class="text-sm text-green-400">Dans la zone autorisée</p>
+            </div>
+          </div>
+          <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Score de confiance -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-medium">Score de confiance</span>
+          <span id="trust-score" class="text-green-400 font-bold">94%</span>
+        </div>
+        <div class="w-full bg-gray-700 rounded-full h-2">
+          <div
+            id="trust-bar"
+            class="bg-green-400 h-2 rounded-full"
+            style="width: 94%"
+          ></div>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">
+          Excellent comportement ce mois-ci
+        </p>
+      </div>
+    </main>
+
+    <script>
+      // ===== GPS TRACKING SYSTEM SIMPLIFIÉ =====
+
+      // Configuration GPS
+      const GPS_CONFIG = {
+        highAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000,
+      };
+
+      // Zones tarifaires Pointe-Noire
+      const PRICING_ZONES = {
+        "centre-ville": { base: 500, perKm: 400, perMin: 25 },
+        banlieue: { base: 300, perKm: 250, perMin: 15 },
+        aeroport: { base: 1000, perKm: 500, perMin: 30 },
+        port: { base: 800, perKm: 350, perMin: 20 },
+        default: { base: 400, perKm: 300, perMin: 20 },
+      };
+
+      // App State avec GPS
+      let appState = {
+        dayStarted: false,
+        paused: false,
+        currentTrip: null,
+        tripStartTime: null,
+        dailyEarnings: 12500,
+        tripCount: 8,
+        cameraStream: null,
+        periodicTimerId: null,
+        // GPS Tracking State
+        gpsWatchId: null,
+        currentPosition: null,
+        positionBuffer: [],
+        tripPoints: [],
+        lastValidPosition: null,
+        trackingActive: false,
+        totalDistance: 0,
+        // Fraud Detection
+        suspiciousEvents: [],
+        lastSpeedCheck: null,
+        trustScore: 94,
+      };
+
+      // ===== UTILITAIRES GPS =====
+
+      // Calcul distance Haversine (en mètres)
+      function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371000; // Rayon terre en mètres
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      // ===== SYSTÈME DE TRACKING SIMPLIFIÉ =====
+
+      // Démarrer tracking GPS
+      function startGPSTracking() {
+        console.log("🔄 Démarrage GPS tracking...");
+
+        if (!navigator.geolocation) {
+          console.error("❌ GPS non supporté");
+          updateGPSStatus("Non supporté", "text-red-400");
+          return false;
+        }
+
+        updateGPSStatus("Démarrage...", "text-yellow-400");
+
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 5000,
+        };
+
+        console.log("📡 Lancement watchPosition...");
+
+        appState.gpsWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+            console.log("🎯 GPS SUCCESS:", {
+              lat: position.coords.latitude.toFixed(6),
+              lng: position.coords.longitude.toFixed(6),
+              accuracy: Math.round(position.coords.accuracy),
+              time: new Date().toLocaleTimeString(),
+            });
+            handleGPSSuccess(position);
+          },
+          (error) => {
+            console.error("❌ GPS ERROR:", error.message);
+            handleGPSError(error);
+          },
+          options
+        );
+
+        appState.trackingActive = true;
+        console.log("✅ WatchPosition lancé, ID:", appState.gpsWatchId);
+
+        // Test timeout
+        setTimeout(() => {
+          if (appState.positionBuffer.length === 0) {
+            console.log("⏳ Aucun point GPS reçu après 5s");
+            updateGPSStatus("En attente signal...", "text-yellow-400");
+          }
+        }, 5000);
+
+        return true;
+      }
+
+      // Arrêter tracking GPS
+      function stopGPSTracking() {
+        console.log("🛑 Arrêt GPS tracking...");
+        if (appState.gpsWatchId) {
+          navigator.geolocation.clearWatch(appState.gpsWatchId);
+          appState.gpsWatchId = null;
+        }
+
+        appState.trackingActive = false;
+        updateGPSStatus("Désactivé", "text-red-400");
+        document.getElementById("gps-indicator").className =
+          "w-3 h-3 bg-red-400 rounded-full";
+      }
+
+      // Succès GPS
+      function handleGPSSuccess(position) {
+        // Mettre à jour le statut immédiatement
+        updateGPSStatus("Actif", "text-green-400");
+        document.getElementById("gps-indicator").className =
+          "gps-indicator w-3 h-3 bg-green-400 rounded-full";
+
+        // Validation basique
+        if (!position || !position.coords) {
+          console.warn("❌ Position invalide");
+          return;
+        }
+
+        const { latitude, longitude, accuracy } = position.coords;
+
+        // Vérifications de base
+        if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+          console.warn("❌ Coordonnées invalides");
+          return;
+        }
+
+        // Créer le point GPS
+        const point = {
+          lat: latitude,
+          lng: longitude,
+          ts: Date.now(),
+          accuracy: accuracy || 0,
+          speed: position.coords.speed || 0,
+          heading: position.coords.heading || 0,
+          provider: "html5",
+        };
+
+        appState.currentPosition = point;
+        appState.lastValidPosition = point;
+
+        // Ajouter au buffer
+        appState.positionBuffer.push(point);
+
+        // Limiter taille buffer
+        if (appState.positionBuffer.length > 1000) {
+          appState.positionBuffer.shift();
+        }
+
+        // Si en course, ajouter aux points du trip
+        if (appState.currentTrip) {
+          appState.tripPoints.push(point);
+          updateTripDistance();
+          console.log(
+            "🚗 Point ajouté à la course, total:",
+            appState.tripPoints.length
+          );
+        }
+
+        // Mettre à jour UI
+        updateGPSDisplay(point);
+
+        console.log(
+          "✅ Point GPS traité - Buffer:",
+          appState.positionBuffer.length,
+          "points"
+        );
+      }
+
+      // Erreur GPS
+      function handleGPSError(error) {
+        console.error("❌ Erreur GPS:", error);
+        let message = "Erreur GPS inconnue";
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            message = "Permission GPS refusée";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            message = "Position indisponible";
+            break;
+          case error.TIMEOUT:
+            message = "Timeout GPS";
+            break;
+        }
+
+        updateGPSStatus(message, "text-red-400");
+        document.getElementById("gps-indicator").className =
+          "w-3 h-3 bg-red-400 rounded-full";
+      }
+
+      // ===== CALCULS DE DISTANCE ET PRIX =====
+
+      // Calculer distance totale du trip
+      function calculateTripDistance() {
+        if (appState.tripPoints.length < 2) return 0;
+
+        let totalDistance = 0;
+        for (let i = 1; i < appState.tripPoints.length; i++) {
+          const prev = appState.tripPoints[i - 1];
+          const curr = appState.tripPoints[i];
+          totalDistance += calculateDistance(
+            prev.lat,
+            prev.lng,
+            curr.lat,
+            curr.lng
+          );
+        }
+
+        return totalDistance / 1000; // en kilomètres
+      }
+
+      // Estimer prix d'une course
+      function estimatePrice(distanceKm, durationMin, zone = "default") {
+        const pricing = PRICING_ZONES[zone] || PRICING_ZONES.default;
+
+        const basePrice = pricing.base;
+        const distancePrice = distanceKm * pricing.perKm;
+        const timePrice = durationMin * pricing.perMin;
+
+        return Math.round(basePrice + distancePrice + timePrice);
+      }
+
+      // Détecter zone tarifaire (simulation basique)
+      function detectPricingZone(lat, lng) {
+        // Coordonnées approximatives Pointe-Noire
+        const centerLat = -4.7692;
+        const centerLng = 11.8636;
+
+        const distance = calculateDistance(centerLat, centerLng, lat, lng);
+
+        if (distance < 3000) return "centre-ville";
+        if (distance < 8000) return "banlieue";
+        if (distance > 15000) return "aeroport";
+        return "default";
+      }
+
+      // ===== DÉTECTION DE FRAUDE =====
+
+      // Ajouter alerte fraude
+      function addFraudAlert(message) {
+        appState.suspiciousEvents.push({
+          message,
+          timestamp: Date.now(),
+          position: appState.currentPosition,
+        });
+
+        // Réduire score de confiance
+        appState.trustScore = Math.max(0, appState.trustScore - 5);
+        updateTrustScore();
+
+        // Afficher alerte
+        showFraudAlert(message);
+
+        console.warn("🚨 FRAUDE DÉTECTÉE:", message);
+      }
+
+      // Afficher alerte fraude
+      function showFraudAlert(message) {
+        document.getElementById("fraud-message").textContent = message;
+        document.getElementById("fraud-alerts").classList.remove("hidden");
+
+        setTimeout(() => {
+          document.getElementById("fraud-alerts").classList.add("hidden");
+        }, 5000);
+      }
+
+      // ===== INTERFACE UTILISATEUR =====
+
+      // Mettre à jour affichage GPS
+      function updateGPSDisplay(point) {
+        console.log("🖥️ Mise à jour UI GPS");
+        document.getElementById("gps-accuracy").textContent = `${Math.round(
+          point.accuracy || 0
+        )}m`;
+        document.getElementById("gps-speed").textContent = `${Math.round(
+          (point.speed || 0) * 3.6
+        )} km/h`;
+        document.getElementById("points-count").textContent =
+          appState.positionBuffer.length;
+        document.getElementById(
+          "last-position"
+        ).textContent = `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
+      }
+
+      // Mettre à jour statut GPS
+      function updateGPSStatus(status, colorClass) {
+        const statusEl = document.getElementById("gps-status");
+        statusEl.textContent = status;
+        statusEl.className = `${colorClass} text-sm`;
+        console.log("📊 Statut GPS:", status);
+      }
+
+      // Mettre à jour distance du trip
+      function updateTripDistance() {
+        const distance = calculateTripDistance();
+        document.getElementById(
+          "current-distance"
+        ).textContent = `${distance.toFixed(2)} km`;
+
+        // Mettre à jour prix estimé
+        const duration = (Date.now() - appState.tripStartTime) / 60000;
+        const zone = appState.currentPosition
+          ? detectPricingZone(
+              appState.currentPosition.lat,
+              appState.currentPosition.lng
+            )
+          : "default";
+        const estimatedPrice = estimatePrice(distance, duration, zone);
+
+        document.getElementById(
+          "estimated-current-price"
+        ).textContent = `${estimatedPrice} FCFA`;
+
+        // Vérifier écart prix
+        const declaredPrice = appState.currentTrip.amount;
+        const priceDiff =
+          Math.abs(declaredPrice - estimatedPrice) / estimatedPrice;
+
+        if (priceDiff > 0.3) {
+          // 30% d'écart
+          addFraudAlert(
+            `Écart prix suspect: ${declaredPrice} vs ${estimatedPrice} FCFA estimé`
+          );
+        }
+      }
+
+      // Mettre à jour score de confiance
+      function updateTrustScore() {
+        document.getElementById(
+          "trust-score"
+        ).textContent = `${appState.trustScore}%`;
+        document.getElementById(
+          "trust-bar"
+        ).style.width = `${appState.trustScore}%`;
+
+        const scoreEl = document.getElementById("trust-score");
+        const barEl = document.getElementById("trust-bar");
+
+        if (appState.trustScore >= 80) {
+          scoreEl.className = "text-green-400 font-bold";
+          barEl.className = "bg-green-400 h-2 rounded-full";
+        } else if (appState.trustScore >= 60) {
+          scoreEl.className = "text-yellow-400 font-bold";
+          barEl.className = "bg-yellow-400 h-2 rounded-full";
+        } else {
+          scoreEl.className = "text-red-400 font-bold";
+          barEl.className = "bg-red-400 h-2 rounded-full";
+        }
+      }
+
+      // ===== INTÉGRATION AVEC L'APP EXISTANTE =====
+
+      // DOM Elements
+      const startDayBtn = document.getElementById("start-day-btn");
+      const declareTripBtn = document.getElementById("declare-trip-btn");
+      const pauseBtn = document.getElementById("pause-btn");
+      const statusBadge = document.getElementById("status-badge");
+      const tripModal = document.getElementById("trip-modal");
+      const cameraModal = document.getElementById("camera-modal");
+      const resultModal = document.getElementById("result-modal");
+      const currentTripCard = document.getElementById("current-trip");
+
+      // Camera permission check
+      async function checkCameraPermission() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          return true;
+        } catch (err) {
+          alert("⚠️ Caméra non autorisée. Contactez votre propriétaire.");
+          return false;
+        }
+      }
+
+      // Helpers to enable/disable buttons nicely
+      function setButtonState(el, enabled) {
+        el.disabled = !enabled;
+        if (enabled) {
+          el.classList.remove("opacity-50", "cursor-not-allowed");
+        } else {
+          if (!el.classList.contains("opacity-50"))
+            el.classList.add("opacity-50");
+          if (!el.classList.contains("cursor-not-allowed"))
+            el.classList.add("cursor-not-allowed");
+        }
+      }
+
+      function updateStatusBadge(text, colorClasses) {
+        statusBadge.textContent = text;
+        statusBadge.className =
+          "px-3 py-1 rounded-full text-sm font-medium " + colorClasses;
+      }
+
+      // Start/End day toggle avec GPS
+      startDayBtn.addEventListener("click", async () => {
+        if (!appState.dayStarted) {
+          const hasCamera = await checkCameraPermission();
+          if (!hasCamera) return;
+
+          // Démarrer GPS
+          if (!startGPSTracking()) {
+            alert("⚠️ Impossible de démarrer le GPS. Fonctionnalité requise.");
+            return;
+          }
+
+          appState.dayStarted = true;
+          appState.paused = false;
+          startDayBtn.textContent = "⏹️ Terminer la journée";
+          startDayBtn.className =
+            "w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg";
+
+          setButtonState(declareTripBtn, true);
+          setButtonState(pauseBtn, true);
+          updateStatusBadge("En service", "bg-green-500 text-white");
+
+          startPeriodicVerification();
+        } else {
+          // End day
+          endDay();
+        }
+      });
+
+      function endDay() {
+        // Stop any current trip
+        if (appState.currentTrip) {
+          if (
+            !confirm(
+              "Une course est en cours. Voulez-vous vraiment terminer la journée ?"
+            )
+          ) {
+            return;
+          }
+          // Soft-reset current trip UI/state
+          appState.currentTrip = null;
+          appState.tripStartTime = null;
+          appState.tripPoints = [];
+          currentTripCard.classList.add("hidden");
+        }
+
+        // Arrêter GPS
+        stopGPSTracking();
+
+        appState.dayStarted = false;
+        appState.paused = false;
+        startDayBtn.textContent = "▶️ Démarrer la journée";
+        startDayBtn.className =
+          "w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors shadow-lg";
+
+        setButtonState(declareTripBtn, false);
+        setButtonState(pauseBtn, false);
+        updateStatusBadge("Libre", "bg-yellow-500 text-black");
+
+        stopPeriodicVerification();
+
+        // Stop camera if left on
+        try {
+          if (appState.cameraStream) {
+            appState.cameraStream.getTracks().forEach((t) => t.stop());
+            appState.cameraStream = null;
+          }
+        } catch {}
+      }
+
+      // Pause/Resume toggle
+      pauseBtn.addEventListener("click", () => {
+        if (!appState.dayStarted) return;
+
+        appState.paused = !appState.paused;
+
+        if (appState.paused) {
+          pauseBtn.textContent = "▶️ Reprendre";
+          updateStatusBadge("En pause", "bg-orange-500 text-white");
+          setButtonState(declareTripBtn, false);
+          stopPeriodicVerification();
+        } else {
+          pauseBtn.textContent = "⏸️ Pause";
+          updateStatusBadge("En service", "bg-green-500 text-white");
+          setButtonState(declareTripBtn, true);
+          startPeriodicVerification();
+        }
+      });
+
+      // Declare trip avec estimation prix
+      declareTripBtn.addEventListener("click", () => {
+        if (!appState.dayStarted || appState.paused) return;
+
+        // Estimer prix basé sur position actuelle
+        if (appState.currentPosition) {
+          const zone = detectPricingZone(
+            appState.currentPosition.lat,
+            appState.currentPosition.lng
+          );
+          const baseEstimate = PRICING_ZONES[zone].base;
+          document.getElementById(
+            "estimated-price"
+          ).textContent = `${baseEstimate}+ FCFA (base ${zone})`;
+        }
+
+        tripModal.classList.remove("hidden");
+        tripModal.classList.add("flex");
+        // Reset inputs
+        document.getElementById("trip-amount").value = "";
+        document.getElementById("passenger-count").value = "1";
+      });
+
+      // Cancel trip declaration
+      document.getElementById("cancel-trip").addEventListener("click", () => {
+        tripModal.classList.add("hidden");
+        tripModal.classList.remove("flex");
+      });
+
+      // Start trip with verification
+      document
+        .getElementById("start-trip")
+        .addEventListener("click", async () => {
+          const amount = document.getElementById("trip-amount").value;
+          const passengers = document.getElementById("passenger-count").value;
+
+          if (!amount) {
+            alert("Veuillez saisir le montant");
+            return;
+          }
+
+          appState.currentTrip = {
+            amount: parseInt(amount),
+            passengers: parseInt(passengers),
+            startPosition: appState.currentPosition,
+            startTime: Date.now(),
+          };
+
+          // Réinitialiser points du trip
+          appState.tripPoints = [];
+          if (appState.currentPosition) {
+            appState.tripPoints.push(appState.currentPosition);
+          }
+
+          tripModal.classList.add("hidden");
+          tripModal.classList.remove("flex");
+
+          // Start camera verification
+          await startCameraVerification();
+        });
+
+      // Camera verification
+      async function startCameraVerification() {
+        cameraModal.classList.remove("hidden");
+        cameraModal.classList.add("flex");
+
+        // Reset overlay/message each time
+        document.getElementById("verification-message").textContent =
+          "Vérification dans ";
+        document.getElementById("countdown").textContent = "5";
+        const overlay = document.getElementById("skeleton-overlay");
+        overlay.classList.add("hidden");
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const video = document.getElementById("camera-feed");
+          video.srcObject = stream;
+          appState.cameraStream = stream;
+
+          // Countdown
+          let countdown = 5;
+          const countdownEl = document.getElementById("countdown");
+          const interval = setInterval(() => {
+            countdown--;
+            countdownEl.textContent = String(countdown);
+            if (countdown <= 0) {
+              clearInterval(interval);
+              captureAndAnalyze();
+            }
+          }, 1000);
+        } catch (err) {
+          alert("Erreur caméra: " + err.message);
+          cameraModal.classList.add("hidden");
+          cameraModal.classList.remove("flex");
+        }
+      }
+
+      // Capture and analyze
+      async function captureAndAnalyze() {
+        document.getElementById("verification-message").textContent =
+          "Analyse en cours...";
+        const overlay = document.getElementById("skeleton-overlay");
+        overlay.classList.remove("hidden");
+
+        // Simulate AI analysis
+        setTimeout(() => {
+          const declaredPassengers = appState.currentTrip.passengers;
+          const detectedPassengers =
+            Math.random() > 0.3 ? declaredPassengers : declaredPassengers + 2; // 70% chance correct
+
+          // Stop camera
+          try {
+            if (appState.cameraStream) {
+              appState.cameraStream
+                .getTracks()
+                .forEach((track) => track.stop());
+              appState.cameraStream = null;
+            }
+          } catch {}
+
+          cameraModal.classList.add("hidden");
+          cameraModal.classList.remove("flex");
+          overlay.classList.add("hidden");
+          showVerificationResult(declaredPassengers, detectedPassengers);
+        }, 2000);
+      }
+
+      // Show verification result
+      function showVerificationResult(declared, detected) {
+        const resultIcon = document.getElementById("result-icon");
+        const resultTitle = document.getElementById("result-title");
+        const resultMessage = document.getElementById("result-message");
+
+        if (Math.abs(declared - detected) <= 1) {
+          // Success
+          resultIcon.textContent = "✅";
+          resultTitle.textContent = "Vérification réussie";
+          resultMessage.textContent = `${detected} passager(s) détecté(s) - Conforme à la déclaration`;
+
+          // Start trip
+          startTrip();
+        } else {
+          // Alert
+          resultIcon.textContent = "⚠️";
+          resultTitle.textContent = "Écart détecté";
+          resultMessage.textContent = `${detected} passager(s) détecté(s) vs ${declared} déclaré(s) - Alerte envoyée au propriétaire`;
+
+          // Add fraud alert
+          addFraudAlert(
+            `Écart passagers: ${detected} détectés vs ${declared} déclarés`
+          );
+
+          // Cancel currentTrip if verification failed
+          appState.currentTrip = null;
+          appState.tripPoints = [];
+        }
+
+        resultModal.classList.remove("hidden");
+        resultModal.classList.add("flex");
+      }
+
+      // Close result modal
+      document.getElementById("close-result").addEventListener("click", () => {
+        resultModal.classList.add("hidden");
+        resultModal.classList.remove("flex");
+      });
+
+      // Start trip
+      function startTrip() {
+        appState.tripStartTime = Date.now();
+
+        // Update UI
+        document.getElementById("current-amount").textContent =
+          appState.currentTrip.amount.toLocaleString() + " FCFA";
+        document.getElementById("current-distance").textContent = "0.0 km";
+        document.getElementById("estimated-current-price").textContent = "-";
+
+        currentTripCard.classList.remove("hidden");
+        updateStatusBadge("En course", "bg-blue-500 text-white");
+
+        // Start trip timer
+        startTripTimer();
+
+        // Stop periodic verification while on trip
+        stopPeriodicVerification();
+      }
+
+      // Trip timer
+      function startTripTimer() {
+        const timer = setInterval(() => {
+          if (!appState.tripStartTime) {
+            clearInterval(timer);
+            return;
+          }
+          const elapsed = Date.now() - appState.tripStartTime;
+          const minutes = Math.floor(elapsed / 60000);
+          const seconds = Math.floor((elapsed % 60000) / 1000);
+          document.getElementById("trip-duration").textContent = `${minutes
+            .toString()
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+        }, 1000);
+      }
+
+      // End trip
+      document.getElementById("end-trip-btn").addEventListener("click", () => {
+        if (!appState.currentTrip) return;
+
+        // Analyse finale de la course
+        const finalDistance = calculateTripDistance();
+        const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
+        const zone = appState.currentPosition
+          ? detectPricingZone(
+              appState.currentPosition.lat,
+              appState.currentPosition.lng
+            )
+          : "default";
+        const finalEstimatedPrice = estimatePrice(
+          finalDistance,
+          finalDuration,
+          zone
+        );
+
+        console.log("📊 RÉSUMÉ COURSE:", {
+          distance: `${finalDistance.toFixed(2)} km`,
+          duration: `${finalDuration.toFixed(1)} min`,
+          declared: `${appState.currentTrip.amount} FCFA`,
+          estimated: `${finalEstimatedPrice} FCFA`,
+          zone: zone,
+          points: appState.tripPoints.length,
+        });
+
+        // Update earnings
+        appState.dailyEarnings += appState.currentTrip.amount;
+        appState.tripCount++;
+
+        document.getElementById("daily-earnings").textContent =
+          appState.dailyEarnings.toLocaleString();
+        document.getElementById("trip-count").textContent = appState.tripCount;
+
+        // Reset trip
+        appState.currentTrip = null;
+        appState.tripStartTime = null;
+        appState.tripPoints = [];
+
+        currentTripCard.classList.add("hidden");
+        updateStatusBadge(
+          appState.dayStarted ? "En service" : "Libre",
+          appState.dayStarted
+            ? "bg-green-500 text-white"
+            : "bg-yellow-500 text-black"
+        );
+
+        // Resume periodic verification if day is on and not paused
+        startPeriodicVerification();
+      });
+
+      // Periodic verification when free
+      function startPeriodicVerification() {
+        stopPeriodicVerification(); // ensure single timer
+        if (!appState.dayStarted || appState.currentTrip || appState.paused)
+          return;
+
+        appState.periodicTimerId = setTimeout(async () => {
+          if (!appState.dayStarted || appState.currentTrip || appState.paused) {
+            startPeriodicVerification();
+            return;
+          }
+
+          // Silent verification
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+            });
+
+            // Simulate detection
+            setTimeout(() => {
+              const detected = Math.random() > 0.9 ? 2 : 0; // 10% fraud chance
+
+              if (detected >= 2) {
+                addFraudAlert("Transport non déclaré détecté");
+              }
+
+              try {
+                stream.getTracks().forEach((track) => track.stop());
+              } catch {}
+              startPeriodicVerification(); // Continue cycle
+            }, 1000);
+          } catch (err) {
+            console.log("Periodic verification failed:", err);
+            startPeriodicVerification(); // Continue cycle
+          }
+        }, 8 * 60 * 1000); // 8 minutes
+      }
+
+      function stopPeriodicVerification() {
+        if (appState.periodicTimerId) {
+          clearTimeout(appState.periodicTimerId);
+          appState.periodicTimerId = null;
+        }
+      }
+
+      // Service Worker Registration avec code inline
+      if ("serviceWorker" in navigator) {
+        const swCode = `
+          const CACHE_NAME = 'taxitracker-v1';
+          const urlsToCache = ['/'];
+          
+          self.addEventListener('install', (event) => {
+            event.waitUntil(
+              caches.open(CACHE_NAME)
+                .then((cache) => cache.addAll(urlsToCache))
+            );
+          });
+          
+          self.addEventListener('fetch', (event) => {
+            event.respondWith(
+              caches.match(event.request)
+                .then((response) => response || fetch(event.request))
+            );
+          });
+        `;
+
+        const blob = new Blob([swCode], { type: "application/javascript" });
+        const swUrl = URL.createObjectURL(blob);
+
+        navigator.serviceWorker
+          .register(swUrl)
+          .then((registration) => console.log("SW registered"))
+          .catch((error) => console.log("SW registration failed:", error));
+      }
+
+      // Test GPS simple au chargement
+      function testGPSAvailability() {
+        if (!navigator.geolocation) {
+          console.error("❌ Geolocation non disponible");
+          return;
+        }
+
+        console.log("🔍 Test GPS au chargement...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log("✅ GPS fonctionne:", {
+              lat: position.coords.latitude.toFixed(6),
+              lng: position.coords.longitude.toFixed(6),
+              accuracy: Math.round(position.coords.accuracy),
+            });
+          },
+          (error) => {
+            console.warn("⚠️ GPS non accessible:", error.message);
+          },
+          { timeout: 10000, maximumAge: 60000 }
+        );
+      }
+
+      // Initialize app
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("🚀 TaxiTracker avec GPS chargé");
+
+        // Test GPS disponibilité
+        if (navigator.geolocation) {
+          console.log("✅ API Geolocation disponible");
+          testGPSAvailability();
+        } else {
+          console.error("❌ API Geolocation non disponible");
+        }
+
+        // Assurer l'état visuel initial des boutons
+        setButtonState(declareTripBtn, false);
+        setButtonState(pauseBtn, false);
+        pauseBtn.textContent = "⏸️ Pause";
+
+        // Initialiser affichage GPS
+        updateGPSStatus("Désactivé", "text-red-400");
+      });
+    </script>
+    <script>
+      (function () {
+        function c() {
+          var b = a.contentDocument || a.contentWindow.document;
+          if (b) {
+            var d = b.createElement("script");
+            d.innerHTML =
+              "window.__CF$cv$params={r:'9871de25b6a5d16e',t:'MTc1OTIxNTg4My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";
+            b.getElementsByTagName("head")[0].appendChild(d);
+          }
+        }
+        if (document.body) {
+          var a = document.createElement("iframe");
+          a.height = 1;
+          a.width = 1;
+          a.style.position = "absolute";
+          a.style.top = 0;
+          a.style.left = 0;
+          a.style.border = "none";
+          a.style.visibility = "hidden";
+          document.body.appendChild(a);
+          if ("loading" !== document.readyState) c();
+          else if (window.addEventListener)
+            document.addEventListener("DOMContentLoaded", c);
+          else {
+            var e = document.onreadystatechange || function () {};
+            document.onreadystatechange = function (b) {
+              e(b);
+              "loading" !== document.readyState &&
+                ((document.onreadystatechange = e), c());
+            };
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

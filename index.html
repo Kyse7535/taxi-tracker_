@@ -11,6 +11,24 @@
       href="data:application/json;base64,eyJuYW1lIjoiVGF4aVRyYWNrZXIiLCJzaG9ydF9uYW1lIjoiVGF4aVRyYWNrZXIiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFmMjkzNyIsInRoZW1lX2NvbG9yIjoiIzM5OGVmNCIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlOVEV5SWlCb1pXbG5hSFE5SWpVeE1pSWdkbWxsZDBKdmVEMGlNQ0F3SURVM01pQTFNVElpSUdacGJHdzlJaU16T1RobFpqUWlQanh5WldOMElIZzlJakV3TUNJZ2VUMGlNVEF3SWlCM2FXUjBhRDBpTXpFeUlpQm9aV2xuYUhROUlqTXhNaUlnY25nOUlqRTJJaUJtYVd4c1BTSWpabVptSWk4K1BDOXpkbWMrIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3N2Zyt4bWwifV19"
     />
     <style>
+      .zoom-btn {
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .zoom-btn:hover {
+        transform: scale(1.1);
+      }
+      .zoom-preset {
+        transition: all 0.2s ease;
+      }
+      .zoom-preset:hover {
+        transform: translateY(-1px);
+      }
+      .zoom-preset.active {
+        background-color: #10b981;
+      }
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
       body {
         font-family: "Inter", sans-serif;
@@ -481,7 +499,9 @@
           </div>
 
           <!-- Contrôles carte -->
-          <div class="flex justify-between items-center mt-2 text-sm">
+          <div
+            class="flex flex-wrap justify-between items-center mt-2 text-sm space-x-1"
+          >
             <div class="flex space-x-2">
               <button
                 id="center-map"
@@ -496,6 +516,36 @@
                 Effacer
               </button>
             </div>
+            <button
+              id="zoom-out"
+              class="zoom-btn bg-gray-600 hover:bg-gray-500 w-8 h-8 rounded-full text-xs font-bold"
+            >
+              −
+            </button>
+            <button
+              id="zoom-ville"
+              class="zoom-preset bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs"
+            >
+              Ville
+            </button>
+            <button
+              id="zoom-quartier"
+              class="zoom-preset bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded text-xs"
+            >
+              Quartier
+            </button>
+            <button
+              id="zoom-rue"
+              class="zoom-preset bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs"
+            >
+              Rue
+            </button>
+            <button
+              id="zoom-in"
+              class="zoom-btn bg-gray-600 hover:bg-gray-500 w-8 h-8 rounded-full text-xs font-bold"
+            >
+              +
+            </button>
             <div class="text-gray-400">
               Zoom: <span id="map-zoom">1.0x</span>
             </div>
@@ -579,13 +629,18 @@
 
       // Calculer les limites de tous les points
       function calculateMapBounds() {
+        // Si on a des limites de zoom définies, les utiliser
+        if (mapState.bounds && mapState.bounds.minLat !== null) {
+          return mapState.bounds;
+        }
+
+        // Sinon, calculer automatiquement
         const allPoints = [...appState.positionBuffer];
         if (appState.currentPosition) {
           allPoints.push(appState.currentPosition);
         }
 
         if (allPoints.length === 0) {
-          // Utiliser Pointe-Noire par défaut
           return {
             minLat: -4.78,
             maxLat: -4.76,
@@ -606,7 +661,6 @@
           maxLng = Math.max(maxLng, point.lng);
         });
 
-        // Ajouter une marge de 10%
         const latMargin = Math.max((maxLat - minLat) * 0.1, 0.001);
         const lngMargin = Math.max((maxLng - minLng) * 0.1, 0.001);
 
@@ -617,7 +671,6 @@
           maxLng: maxLng + lngMargin,
         };
       }
-
       // Convertir coordonnées GPS en coordonnées SVG
       function gpsToSVG(lat, lng) {
         const bounds = calculateMapBounds();
@@ -1186,6 +1239,154 @@
         console.log(
           `✅ Simulation multi-waypoints détaillée terminée: ${appState.positionBuffer.length} points`
         );
+      }
+
+      // ===== SYSTÈME DE ZOOM =====
+
+      // Niveaux de zoom prédéfinis (en facteur de marge)
+      const ZOOM_LEVELS = {
+        ville: 0.5, // Vue large de la ville
+        quartier: 0.2, // Vue quartier
+        rue: 0.05, // Vue rapprochée
+        auto: 0.1, // Zoom automatique par défaut
+      };
+
+      // Appliquer un niveau de zoom
+      function applyZoom(level) {
+        console.log(`🔍 Application zoom: ${level}`);
+
+        if (!mapState.visible) {
+          console.log("⚠️ Carte non visible");
+          return;
+        }
+
+        const allPoints = [...appState.positionBuffer];
+        if (appState.currentPosition) {
+          allPoints.push(appState.currentPosition);
+        }
+
+        if (allPoints.length === 0) {
+          console.log("⚠️ Aucun point pour le zoom");
+          return;
+        }
+
+        // Calculer nouvelles limites avec le facteur de zoom
+        let minLat = allPoints[0].lat;
+        let maxLat = allPoints[0].lat;
+        let minLng = allPoints[0].lng;
+        let maxLng = allPoints[0].lng;
+
+        allPoints.forEach((point) => {
+          minLat = Math.min(minLat, point.lat);
+          maxLat = Math.max(maxLat, point.lat);
+          minLng = Math.min(minLng, point.lng);
+          maxLng = Math.max(maxLng, point.lng);
+        });
+
+        // Appliquer le facteur de zoom
+        const zoomFactor = ZOOM_LEVELS[level] || ZOOM_LEVELS.auto;
+        const latRange = Math.max(maxLat - minLat, 0.001);
+        const lngRange = Math.max(maxLng - minLng, 0.001);
+
+        const latMargin = latRange * zoomFactor;
+        const lngMargin = lngRange * zoomFactor;
+
+        // Mettre à jour l'état de la carte
+        mapState.bounds = {
+          minLat: minLat - latMargin,
+          maxLat: maxLat + latMargin,
+          minLng: minLng - lngMargin,
+          maxLng: maxLng + lngMargin,
+        };
+
+        mapState.zoom = 1 / zoomFactor; // Facteur d'affichage
+
+        // Redessiner avec le nouveau zoom
+        redrawAllPoints();
+
+        // Mettre à jour l'affichage du zoom
+        document.getElementById(
+          "map-zoom"
+        ).textContent = `${mapState.zoom.toFixed(1)}x`;
+
+        // Mettre à jour les boutons actifs
+        updateZoomButtons(level);
+
+        console.log(`✅ Zoom ${level} appliqué (${mapState.zoom.toFixed(1)}x)`);
+      }
+
+      // Zoom manuel (+ et -)
+      function manualZoom(direction) {
+        const currentZoom = mapState.zoom;
+        let newZoom;
+
+        if (direction === "in") {
+          newZoom = Math.min(currentZoom * 1.5, 60); // Max 10x
+        } else {
+          newZoom = Math.max(currentZoom / 1.5, 0.1); // Min 0.1x
+        }
+
+        // Calculer le facteur de marge correspondant
+        const marginFactor = 1 / newZoom;
+
+        // Appliquer le zoom personnalisé
+        const allPoints = [...appState.positionBuffer];
+        if (appState.currentPosition) {
+          allPoints.push(appState.currentPosition);
+        }
+
+        if (allPoints.length === 0) return;
+
+        let minLat = allPoints[0].lat;
+        let maxLat = allPoints[0].lat;
+        let minLng = allPoints[0].lng;
+        let maxLng = allPoints[0].lng;
+
+        allPoints.forEach((point) => {
+          minLat = Math.min(minLat, point.lat);
+          maxLat = Math.max(maxLat, point.lat);
+          minLng = Math.min(minLng, point.lng);
+          maxLng = Math.max(maxLng, point.lng);
+        });
+
+        const latRange = Math.max(maxLat - minLat, 0.001);
+        const lngRange = Math.max(maxLng - minLng, 0.001);
+
+        const latMargin = latRange * marginFactor;
+        const lngMargin = lngRange * marginFactor;
+
+        mapState.bounds = {
+          minLat: minLat - latMargin,
+          maxLat: maxLat + latMargin,
+          minLng: minLng - lngMargin,
+          maxLng: maxLng + lngMargin,
+        };
+
+        mapState.zoom = newZoom;
+
+        redrawAllPoints();
+        document.getElementById(
+          "map-zoom"
+        ).textContent = `${mapState.zoom.toFixed(1)}x`;
+        updateZoomButtons("manual");
+
+        console.log(`🔍 Zoom manuel: ${direction} → ${newZoom.toFixed(1)}x`);
+      }
+
+      // Mettre à jour l'apparence des boutons de zoom
+      function updateZoomButtons(activeLevel) {
+        // Retirer la classe active de tous les presets
+        document.querySelectorAll(".zoom-preset").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+
+        // Ajouter la classe active au niveau sélectionné
+        if (activeLevel !== "manual") {
+          const activeBtn = document.getElementById(`zoom-${activeLevel}`);
+          if (activeBtn) {
+            activeBtn.classList.add("active");
+          }
+        }
       }
 
       // ===== SYSTÈME DE TRACKING SIMPLIFIÉ =====
@@ -2001,6 +2202,22 @@
 
         simulateParisRoute();
         // simulateParisRouteMultiWaypointsDetailed();
+
+        document
+          .getElementById("zoom-in")
+          .addEventListener("click", () => manualZoom("in"));
+        document
+          .getElementById("zoom-out")
+          .addEventListener("click", () => manualZoom("out"));
+        document
+          .getElementById("zoom-ville")
+          .addEventListener("click", () => applyZoom("ville"));
+        document
+          .getElementById("zoom-quartier")
+          .addEventListener("click", () => applyZoom("quartier"));
+        document
+          .getElementById("zoom-rue")
+          .addEventListener("click", () => applyZoom("rue"));
 
         // Test GPS disponibilité
         if (navigator.geolocation) {

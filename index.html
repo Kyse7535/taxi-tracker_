@@ -599,9 +599,32 @@
           });
           this.updatedAt = new Date().toISOString();
         }
-
+        // Sérialisation pour stockage
+        _serialize() {
+          return {
+            id: this.id,
+            amount: this.amount,
+            passengers: this.passengers,
+            startPosition: this.startPosition,
+            endPosition: this.endPosition,
+            startTime: this.startTime,
+            endTime: this.endTime,
+            distance: this.distance,
+            duration: this.duration,
+            zone: this.zone,
+            status: this.status,
+            estimatedPrice: this.estimatedPrice,
+            fraudAlerts: this.fraudAlerts,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+          };
+        }
+        // Désérialisation depuis stockage
+        static _deserialize(data) {
+          return new Trip(data);
+        }
         toJSON() {
-          return { ...this };
+          return this._serialize();
         }
       }
 
@@ -627,9 +650,29 @@
             Math.random().toString(36).substr(2)
           );
         }
+        // Sérialisation pour stockage
+        _serialize() {
+          return {
+            id: this.id,
+            lat: this.lat,
+            lng: this.lng,
+            accuracy: this.accuracy,
+            speed: this.speed,
+            heading: this.heading,
+            altitude: this.altitude,
+            tripId: this.tripId,
+            provider: this.provider,
+            timestamp: this.timestamp,
+          };
+        }
+
+        // Désérialisation depuis stockage
+        static _deserialize(data) {
+          return new GPSPoint(data);
+        }
 
         toJSON() {
-          return { ...this };
+          return this._serialize();
         }
       }
 
@@ -665,8 +708,29 @@
 
           this.updatedAt = new Date().toISOString();
         }
+        // Sérialisation pour stockage
+        _serialize() {
+          return {
+            id: this.id,
+            date: this.date,
+            totalEarnings: this.totalEarnings,
+            tripCount: this.tripCount,
+            totalDistance: this.totalDistance,
+            totalDuration: this.totalDuration,
+            averageTrip: this.averageTrip,
+            fraudAlerts: this.fraudAlerts,
+            zones: this.zones,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+          };
+        }
+
+        // Désérialisation depuis stockage
+        static _deserialize(data) {
+          return new DailyStats(data);
+        }
         toJSON() {
-          return { ...this };
+          return this._serialize();
         }
       }
 
@@ -2516,7 +2580,7 @@
           tripModal.classList.remove("flex");
 
           // Start camera verification
-          await startCameraVerification();
+          // await startCameraVerification();
         });
 
       // Camera verification
@@ -2527,7 +2591,7 @@
         // Reset overlay/message each time
         document.getElementById("verification-message").textContent =
           "Vérification dans ";
-        document.getElementById("countdown").textContent = "5";
+        // document.getElementById("countdown").textContent = "5";
         const overlay = document.getElementById("skeleton-overlay");
         overlay.classList.add("hidden");
 

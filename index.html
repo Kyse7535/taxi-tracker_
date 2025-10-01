@@ -2915,6 +2915,7 @@
             // Mettre à jour la course dans la base
             await tripRepository.update(appState.currentTrip.id, {
               endPosition: appState.currentPosition,
+              endTime: Date.now(),
               distance: finalDistance,
               duration: finalDuration * 60000, // en millisecondes
               zone: zone,

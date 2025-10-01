@@ -1409,12 +1409,6 @@
         detectCurrentZone(point.lat, point.lng);
         updateZoneDisplay();
 
-        // Ajouter à la carte si visible
-        if (mapState.visible) {
-          addPointToMap(point.lat, point.lng, "current");
-        }
-        addPointToMap(point.lat, point.lng, "current");
-
         console.log(
           "✅ Point GPS traité - Buffer:",
           appState.positionBuffer.length,

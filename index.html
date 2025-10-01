@@ -3267,7 +3267,7 @@
       // Afficher les détails d'une course
       async function showTripDetails(tripId) {
         try {
-          const trip = await tripRepository.getById(tripId);
+          const trip = await tripRepository.findById(tripId);
           if (!trip) {
             console.error("Course non trouvée:", tripId);
             return;

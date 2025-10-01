@@ -425,46 +425,6 @@
         </p>
       </div>
 
-      <!-- Gestion des données -->
-      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
-        <div class="flex items-center justify-between mb-4">
-          <span class="font-medium">💾 Données</span>
-          <span id="data-count" class="text-blue-400 text-sm">0 courses</span>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            id="view-history-btn"
-            class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            📋 Historique
-          </button>
-          <button
-            id="export-json-btn"
-            class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            📄 Export JSON
-          </button>
-          <button
-            id="export-csv-btn"
-            class="bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            📊 Export CSV
-          </button>
-          <button
-            id="clear-data-btn"
-            class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            🗑️ Effacer
-          </button>
-          <button
-            id="stats-btn"
-            class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            📈 Stats
-          </button>
-        </div>
-      </div>
-
       <!-- Carte GPS -->
       <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
         <div class="flex items-center justify-between mb-4">
@@ -2452,58 +2412,77 @@
         }, 1000);
       }
 
-      // End trip
-      document.getElementById("end-trip-btn").addEventListener("click", () => {
-        if (!appState.currentTrip) return;
+      // End trip avec sauvegarde automatique
+      document
+        .getElementById("end-trip-btn")
+        .addEventListener("click", async () => {
+          if (!appState.currentTrip) return;
 
-        // Analyse finale de la course
-        const finalDistance = calculateTripDistance();
-        const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
-        const zone = appState.currentPosition
-          ? detectPricingZone(
-              appState.currentPosition.lat,
-              appState.currentPosition.lng
-            )
-          : "default";
-        const finalEstimatedPrice = estimatePrice(
-          finalDistance,
-          finalDuration,
-          zone
-        );
+          // Analyse finale de la course
+          const finalDistance = calculateTripDistance();
+          const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
+          const zone = appState.currentPosition
+            ? detectPricingZone(
+                appState.currentPosition.lat,
+                appState.currentPosition.lng
+              )
+            : "default";
+          const finalEstimatedPrice = estimatePrice(
+            finalDistance,
+            finalDuration,
+            zone
+          );
+          try {
+            // Mettre à jour la course dans la base
+            await tripRepository.update(appState.currentTrip.id, {
+              endPosition: appState.currentPosition,
+              distance: finalDistance,
+              duration: finalDuration * 60000, // en millisecondes
+              zone: zone,
+              estimatedPrice: finalEstimatedPrice,
+              status: "completed",
+            });
+            // Mettre à jour les statistiques quotidiennes
+            const todayStats = await statsRepository.getOrCreateToday();
+            todayStats.updateFromTrip({
+              amount: appState.currentTrip.amount,
+              distance: finalDistance,
+              duration: finalDuration * 60000,
+              zone: zone,
+              fraudAlerts: appState.suspiciousEvents.filter(
+                (e) => e.timestamp > appState.tripStartTime
+              ),
+            });
+            await statsRepository.save(todayStats);
 
-        console.log("📊 RÉSUMÉ COURSE:", {
-          distance: `${finalDistance.toFixed(2)} km`,
-          duration: `${finalDuration.toFixed(1)} min`,
-          declared: `${appState.currentTrip.amount} FCFA`,
-          estimated: `${finalEstimatedPrice} FCFA`,
-          zone: zone,
-          points: appState.tripPoints.length,
+            console.log("💾 Course terminée et sauvegardée");
+          } catch (error) {
+            console.error("❌ Erreur sauvegarde fin de course:", error);
+          }
+          // Update earnings (interface seulement)
+          appState.dailyEarnings += appState.currentTrip.amount;
+          appState.tripCount++;
+
+          document.getElementById("daily-earnings").textContent =
+            appState.dailyEarnings.toLocaleString();
+          document.getElementById("trip-count").textContent =
+            appState.tripCount;
+
+          // Reset trip
+          appState.currentTrip = null;
+          appState.tripStartTime = null;
+          appState.tripPoints = [];
+
+          currentTripCard.classList.add("hidden");
+          updateStatusBadge(
+            appState.dayStarted ? "En service" : "Libre",
+            appState.dayStarted
+              ? "bg-green-500 text-white"
+              : "bg-yellow-500 text-black"
+          );
+          // Resume periodic verification if day is on and not paused
+          startPeriodicVerification();
         });
-
-        // Update earnings
-        appState.dailyEarnings += appState.currentTrip.amount;
-        appState.tripCount++;
-
-        document.getElementById("daily-earnings").textContent =
-          appState.dailyEarnings.toLocaleString();
-        document.getElementById("trip-count").textContent = appState.tripCount;
-
-        // Reset trip
-        appState.currentTrip = null;
-        appState.tripStartTime = null;
-        appState.tripPoints = [];
-
-        currentTripCard.classList.add("hidden");
-        updateStatusBadge(
-          appState.dayStarted ? "En service" : "Libre",
-          appState.dayStarted
-            ? "bg-green-500 text-white"
-            : "bg-yellow-500 text-black"
-        );
-
-        // Resume periodic verification if day is on and not paused
-        startPeriodicVerification();
-      });
 
       // Periodic verification when free
       function startPeriodicVerification() {
@@ -2626,95 +2605,6 @@
           .getElementById("zoom-rue")
           .addEventListener("click", () => applyZoom("rue"));
 
-        // Gestion des données
-        document
-          .getElementById("export-csv-btn")
-          .addEventListener("click", async () => {
-            try {
-              const csvData = await tripRepository.exportCSV();
-              downloadFile(csvData, "mes-courses.csv", "text/csv");
-              console.log("📊 Export CSV réussi");
-            } catch (error) {
-              alert("Erreur export CSV: " + error.message);
-            }
-          });
-        document
-          .getElementById("view-history-btn")
-          .addEventListener("click", async () => {
-            try {
-              await showTripHistory();
-            } catch (error) {
-              alert("Erreur historique: " + error.message);
-            }
-          });
-        document
-          .getElementById("clear-data-btn")
-          .addEventListener("click", async () => {
-            if (
-              confirm(
-                "⚠️ Effacer toutes les données sauvegardées ?\n\nCette action est irréversible."
-              )
-            ) {
-              localStorage.clear();
-              console.log("🗑️ Toutes les données effacées");
-              location.reload();
-            }
-          });
-        // Fonction utilitaire pour télécharger
-        function downloadFile(content, filename, contentType) {
-          const blob = new Blob([content], { type: contentType });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(url);
-          console.log("💾 Fichier téléchargé:", filename);
-        }
-        // Afficher historique des courses
-        async function showTripHistory() {
-          const trips = await tripRepository.findAll();
-          const completedTrips = trips
-            .filter((t) => t.status === "completed")
-            .slice(-10); // 10 dernières
-
-          if (completedTrips.length === 0) {
-            alert("Aucune course terminée dans l'historique");
-            return;
-          }
-
-          let historyText = "📋 HISTORIQUE DES COURSES\n\n";
-          completedTrips.reverse().forEach((trip, index) => {
-            const date = new Date(trip.createdAt).toLocaleDateString("fr-FR");
-            const time = new Date(trip.createdAt).toLocaleTimeString("fr-FR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-            historyText += `${index + 1}. ${date} ${time}\n`;
-            historyText += `   💰 ${trip.amount} FCFA | 👥 ${trip.passengers} pass.\n`;
-            historyText += `   📍 ${trip.distance.toFixed(
-              1
-            )}km | ⏱️ ${Math.round(trip.duration / 60)}min\n\n`;
-          });
-
-          alert(historyText);
-        }
-
-        // Mettre à jour le compteur de données
-        async function updateDataCount() {
-          try {
-            const tripCount = await tripRepository.count();
-            const gpsCount = (await gpsRepository.findAll()).length;
-            document.getElementById(
-              "data-count"
-            ).textContent = `${tripCount} courses, ${gpsCount} GPS`;
-          } catch (error) {
-            document.getElementById("data-count").textContent =
-              "Erreur données";
-            console.error("❌ Erreur compteur:", error);
-          }
-        }
-
         // Mettre à jour les statistiques quotidiennes
         async function updateDailyStats() {
           try {
@@ -2733,7 +2623,6 @@
         }
 
         // Appeler au chargement
-        updateDataCount();
         updateDailyStats();
 
         // Test GPS disponibilité

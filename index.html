@@ -406,6 +406,31 @@
           <div class="w-3 h-3 bg-green-400 rounded-full"></div>
         </div>
       </div>
+      <!-- Historique des courses -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">📋</span>
+            <div>
+              <p class="font-medium">Historique</p>
+              <p class="text-sm text-gray-400" id="trip-history-count">
+                0 courses
+              </p>
+            </div>
+          </div>
+          <button
+            id="refresh-history-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm"
+          >
+            🔄 Actualiser
+          </button>
+        </div>
+        <div id="trip-history-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <p class="text-gray-500 text-sm text-center py-4">
+            Aucune course enregistrée
+          </p>
+        </div>
+      </div>
 
       <!-- Score de confiance -->
       <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
@@ -548,6 +573,134 @@
             </button>
             <div class="text-gray-400">
               Zoom: <span id="map-zoom">1.0x</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal détails de course -->
+      <div
+        id="trip-details-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden z-50"
+      >
+        <div class="flex items-center justify-center min-h-screen p-4">
+          <div
+            class="bg-gray-900 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-xl font-bold text-white">
+                📋 Détails de la course
+              </h2>
+              <button
+                id="close-trip-details"
+                class="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <!-- Contenu principal -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Informations de la course -->
+              <div class="space-y-4">
+                <div class="bg-gray-800 rounded-lg p-4">
+                  <h3 class="font-semibold text-white mb-3">
+                    💰 Informations générales
+                  </h3>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Montant:</span>
+                      <span
+                        class="text-green-400 font-semibold"
+                        id="detail-amount"
+                        >-</span
+                      >
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Passagers:</span>
+                      <span class="text-white" id="detail-passengers">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Zone:</span>
+                      <span class="text-blue-400" id="detail-zone">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Distance:</span>
+                      <span class="text-white" id="detail-distance">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Durée:</span>
+                      <span class="text-white" id="detail-duration">-</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg p-4">
+                  <h3 class="font-semibold text-white mb-3">🕐 Horaires</h3>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Début:</span>
+                      <span class="text-white" id="detail-start-time">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Fin:</span>
+                      <span class="text-white" id="detail-end-time">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-400">Date:</span>
+                      <span class="text-white" id="detail-date">-</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="bg-gray-800 rounded-lg p-4"
+                  id="detail-alerts-section"
+                  style="display: none"
+                >
+                  <h3 class="font-semibold text-red-400 mb-3">
+                    ⚠️ Alertes détectées
+                  </h3>
+                  <div id="detail-alerts-list" class="space-y-1 text-sm"></div>
+                </div>
+              </div>
+
+              <!-- Carte de l'itinéraire -->
+              <div class="space-y-4">
+                <div class="bg-gray-800 rounded-lg p-4">
+                  <h3 class="font-semibold text-white mb-3">
+                    🗺️ Itinéraire parcouru
+                  </h3>
+                  <div
+                    id="trip-map"
+                    class="w-full h-80 bg-gray-700 rounded-lg relative overflow-hidden"
+                  >
+                    <div
+                      class="absolute inset-0 flex items-center justify-center text-gray-400"
+                    >
+                      <div class="text-center">
+                        <div class="text-4xl mb-2">🗺️</div>
+                        <p>Chargement de la carte...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg p-4">
+                  <h3 class="font-semibold text-white mb-3">📍 Positions</h3>
+                  <div class="space-y-2 text-sm">
+                    <div>
+                      <span class="text-gray-400">Départ:</span>
+                      <p class="text-green-400" id="detail-start-position">-</p>
+                    </div>
+                    <div>
+                      <span class="text-gray-400">Arrivée:</span>
+                      <p class="text-red-400" id="detail-end-position">-</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2999,7 +3152,246 @@
             { timeout: 5000, maximumAge: 60000 }
           );
         }
+
+        // Event listeners pour l'historique
+        // Charger l'historique au démarrage
+        loadTripHistory();
+        // Bouton actualiser historique
+        document
+          .getElementById("refresh-history-btn")
+          .addEventListener("click", () => {
+            console.log("🔄 Actualisation historique...");
+            loadTripHistory();
+          });
+        // Fermer le modal de détails
+        document
+          .getElementById("close-trip-details")
+          .addEventListener("click", () => {
+            document
+              .getElementById("trip-details-modal")
+              .classList.add("hidden");
+          });
+        // Fermer le modal en cliquant à l'extérieur
+        document
+          .getElementById("trip-details-modal")
+          .addEventListener("click", (e) => {
+            if (e.target.id === "trip-details-modal") {
+              document
+                .getElementById("trip-details-modal")
+                .classList.add("hidden");
+            }
+          });
       });
+
+      // ===== SYSTÈME D'HISTORIQUE DES COURSES =====
+
+      // Mettre à jour l'historique après chaque course terminée
+      const originalEndTrip = document.getElementById("end-trip-btn").onclick;
+      document
+        .getElementById("end-trip-btn")
+        .addEventListener("click", async () => {
+          // Attendre un peu que la course soit sauvegardée
+          setTimeout(() => {
+            loadTripHistory();
+          }, 1000);
+        });
+
+      // Charger et afficher l'historique
+      async function loadTripHistory() {
+        try {
+          const trips = await tripRepository.getAll();
+          const completedTrips = trips.filter(
+            (trip) => trip.status === "completed"
+          );
+
+          // Trier par date décroissante
+          completedTrips.sort(
+            (a, b) => new Date(b.startTime) - new Date(a.startTime)
+          );
+
+          const historyList = document.getElementById("trip-history-list");
+          const historyCount = document.getElementById("trip-history-count");
+
+          historyCount.textContent = `${completedTrips.length} course${
+            completedTrips.length > 1 ? "s" : ""
+          }`;
+
+          if (completedTrips.length === 0) {
+            historyList.innerHTML =
+              '<p class="text-gray-500 text-sm text-center py-4">Aucune course enregistrée</p>';
+            return;
+          }
+
+          historyList.innerHTML = completedTrips
+            .map((trip) => {
+              const startDate = new Date(trip.startTime);
+              const duration = Math.round(trip.duration / 60000); // en minutes
+              const distance = (trip.distance / 1000).toFixed(1); // en km
+              return `
+        <div class="bg-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-600 transition-colors" 
+             onclick="showTripDetails('${trip.id}')">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-green-400">${trip.amount.toLocaleString()} FCFA</span>
+                <span class="text-xs text-gray-400">${startDate.toLocaleDateString()}</span>
+                  </div>
+              <div class="flex items-center justify-between text-sm text-gray-300">
+                <span>${distance}km • ${duration}min</span>
+                <span class="text-blue-400">${trip.zone}</span>
+              </div>
+              <div class="text-xs text-gray-400 mt-1">
+                ${startDate.toLocaleTimeString()} • ${
+                trip.passengers
+              } passager${trip.passengers > 1 ? "s" : ""}
+              </div>
+            </div>
+            <div class="ml-3 text-gray-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+      `;
+            })
+            .join("");
+          console.log(`📋 Historique chargé: ${completedTrips.length} courses`);
+        } catch (error) {
+          console.error("❌ Erreur chargement historique:", error);
+        }
+      }
+
+      // Afficher les détails d'une course
+      async function showTripDetails(tripId) {
+        try {
+          const trip = await tripRepository.getById(tripId);
+          if (!trip) {
+            console.error("Course non trouvée:", tripId);
+            return;
+          }
+          // Remplir les informations
+          document.getElementById(
+            "detail-amount"
+          ).textContent = `${trip.amount.toLocaleString()} FCFA`;
+          document.getElementById("detail-passengers").textContent =
+            trip.passengers;
+          document.getElementById("detail-zone").textContent = trip.zone;
+          document.getElementById("detail-distance").textContent = `${(
+            trip.distance / 1000
+          ).toFixed(1)} km`;
+          document.getElementById(
+            "detail-duration"
+          ).textContent = `${Math.round(trip.duration / 60000)} min`;
+          // Horaires
+          const startDate = new Date(trip.startTime);
+          const endDate = trip.endTime ? new Date(trip.endTime) : null;
+
+          document.getElementById("detail-start-time").textContent =
+            startDate.toLocaleTimeString();
+          document.getElementById("detail-end-time").textContent = endDate
+            ? endDate.toLocaleTimeString()
+            : "En cours";
+          document.getElementById("detail-date").textContent =
+            startDate.toLocaleDateString();
+          // Positions
+          document.getElementById("detail-start-position").textContent =
+            trip.startPosition
+              ? `${trip.startPosition.lat.toFixed(
+                  6
+                )}, ${trip.startPosition.lng.toFixed(6)}`
+              : "Non disponible";
+          document.getElementById("detail-end-position").textContent =
+            trip.endPosition
+              ? `${trip.endPosition.lat.toFixed(
+                  6
+                )}, ${trip.endPosition.lng.toFixed(6)}`
+              : "Non disponible";
+          // Alertes
+          const alertsSection = document.getElementById(
+            "detail-alerts-section"
+          );
+          const alertsList = document.getElementById("detail-alerts-list");
+
+          if (trip.fraudAlerts && trip.fraudAlerts.length > 0) {
+            alertsSection.style.display = "block";
+            alertsList.innerHTML = trip.fraudAlerts
+              .map(
+                (alert) => `
+        <div class="flex items-center space-x-2">
+          <span class="text-red-400">⚠️</span>
+          <span class="text-gray-300">${alert.message}</span>
+          <span class="text-xs text-gray-500">${new Date(
+            alert.timestamp
+          ).toLocaleTimeString()}</span>
+        </div>
+      `
+              )
+              .join("");
+          } else {
+            alertsSection.style.display = "none";
+          }
+          // Charger la carte
+          await loadTripMap(trip);
+
+          // Afficher le modal
+          document
+            .getElementById("trip-details-modal")
+            .classList.remove("hidden");
+
+          console.log("📋 Détails course affichés:", tripId);
+        } catch (error) {
+          console.error("❌ Erreur affichage détails:", error);
+        }
+      }
+      // Charger la carte de l'itinéraire avec OpenStreetMap
+      async function loadTripMap(trip) {
+        const mapContainer = document.getElementById("trip-map");
+
+        if (!trip.startPosition) {
+          mapContainer.innerHTML = `
+      <div class="absolute inset-0 flex items-center justify-center text-gray-400">
+        <div class="text-center">
+          <div class="text-4xl mb-2">📍</div>
+          <p>Aucune donnée GPS disponible</p>
+        </div>
+      </div>
+    `;
+          return;
+        }
+        // Utiliser Leaflet avec OpenStreetMap (gratuit)
+        const centerLat = trip.startPosition.lat;
+        const centerLng = trip.startPosition.lng;
+
+        // Créer une carte statique simple avec OpenStreetMap
+        const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${
+          centerLng - 0.01
+        },${centerLat - 0.01},${centerLng + 0.01},${
+          centerLat + 0.01
+        }&layer=mapnik&marker=${centerLat},${centerLng}`;
+        mapContainer.innerHTML = `
+    <iframe 
+      src="${mapUrl}"
+      width="100%" 
+      height="100%" 
+      frameborder="0" 
+      style="border: 0; border-radius: 8px;"
+      allowfullscreen>
+    </iframe>
+    <div class="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+      🚗 Itinéraire de la course
+    </div>
+    ${
+      trip.endPosition
+        ? `
+      <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+        📍 ${(trip.distance / 1000).toFixed(1)}km parcourus
+      </div>
+    `
+        : ""
+    }
+  `;
+      }
     </script>
     <script>
       (function () {

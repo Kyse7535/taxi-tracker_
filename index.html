@@ -2732,6 +2732,8 @@
           tripModal.classList.add("hidden");
           tripModal.classList.remove("flex");
 
+          startTrip();
+
           // Start camera verification
           // await startCameraVerification();
         });
@@ -2871,7 +2873,7 @@
         currentTripCard.classList.remove("hidden");
         updateStatusBadge("En course", "bg-blue-500 text-white");
         startTripTimer();
-        stopPeriodicVerification();
+        // stopPeriodicVerification();
       }
       // Trip timer
       function startTripTimer() {

@@ -425,6 +425,46 @@
         </p>
       </div>
 
+      <!-- Gestion des données -->
+      <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="font-medium">💾 Données</span>
+          <span id="data-count" class="text-blue-400 text-sm">0 courses</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            id="view-history-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm"
+          >
+            📋 Historique
+          </button>
+          <button
+            id="export-json-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm"
+          >
+            📄 Export JSON
+          </button>
+          <button
+            id="export-csv-btn"
+            class="bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm"
+          >
+            📊 Export CSV
+          </button>
+          <button
+            id="clear-data-btn"
+            class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg text-sm"
+          >
+            🗑️ Effacer
+          </button>
+          <button
+            id="stats-btn"
+            class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg text-sm"
+          >
+            📈 Stats
+          </button>
+        </div>
+      </div>
+
       <!-- Carte GPS -->
       <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
         <div class="flex items-center justify-between mb-4">
@@ -555,6 +595,364 @@
     </main>
 
     <script>
+      // ===== ENTITÉS MÉTIER =====
+
+      // Entité Course
+      class Trip {
+        constructor(data = {}) {
+          this.id = data.id || this.generateId();
+          this.amount = data.amount || 0;
+          this.passengers = data.passengers || 1;
+          this.startPosition = data.startPosition || null;
+          this.endPosition = data.endPosition || null;
+          this.startTime = data.startTime || Date.now();
+          this.endTime = data.endTime || null;
+          this.distance = data.distance || 0;
+          this.duration = data.duration || 0;
+          this.zone = data.zone || "default";
+          this.status = data.status || "active"; // active, completed, cancelled
+          this.estimatedPrice = data.estimatedPrice || 0;
+          this.fraudAlerts = data.fraudAlerts || [];
+          this.createdAt = data.createdAt || new Date().toISOString();
+          this.updatedAt = data.updatedAt || null;
+        }
+        generateId() {
+          return (
+            "trip_" +
+            Date.now().toString(36) +
+            Math.random().toString(36).substr(2)
+          );
+        }
+
+        complete(endPosition, distance, duration) {
+          this.endPosition = endPosition;
+          this.endTime = Date.now();
+          this.distance = distance;
+          this.duration = duration;
+          this.status = "completed";
+          this.updatedAt = new Date().toISOString();
+        }
+        addFraudAlert(alert) {
+          this.fraudAlerts.push({
+            message: alert,
+            timestamp: Date.now(),
+          });
+          this.updatedAt = new Date().toISOString();
+        }
+
+        toJSON() {
+          return { ...this };
+        }
+      }
+
+      // Entité Point GPS
+      class GPSPoint {
+        constructor(data = {}) {
+          this.id = data.id || this.generateId();
+          this.lat = data.lat || 0;
+          this.lng = data.lng || 0;
+          this.accuracy = data.accuracy || 0;
+          this.speed = data.speed || 0;
+          this.heading = data.heading || 0;
+          this.altitude = data.altitude || 0;
+          this.tripId = data.tripId || null;
+          this.provider = data.provider || "html5";
+          this.timestamp = data.timestamp || new Date().toISOString();
+        }
+
+        generateId() {
+          return (
+            "gps_" +
+            Date.now().toString(36) +
+            Math.random().toString(36).substr(2)
+          );
+        }
+
+        toJSON() {
+          return { ...this };
+        }
+      }
+
+      // Entité Statistiques
+      class DailyStats {
+        constructor(data = {}) {
+          this.id = data.id || this.generateId();
+          this.date = data.date || new Date().toISOString().split("T")[0];
+          this.totalEarnings = data.totalEarnings || 0;
+          this.tripCount = data.tripCount || 0;
+          this.totalDistance = data.totalDistance || 0;
+          this.totalDuration = data.totalDuration || 0;
+          this.averageTrip = data.averageTrip || 0;
+          this.fraudAlerts = data.fraudAlerts || 0;
+          this.zones = data.zones || {};
+          this.createdAt = data.createdAt || new Date().toISOString();
+          this.updatedAt = data.updatedAt || null;
+        }
+
+        generateId() {
+          return "stats_" + this.date;
+        }
+        updateFromTrip(trip) {
+          this.totalEarnings += trip.amount;
+          this.tripCount += 1;
+          this.totalDistance += trip.distance;
+          this.totalDuration += trip.duration;
+          this.averageTrip = this.totalEarnings / this.tripCount;
+          this.fraudAlerts += trip.fraudAlerts.length;
+
+          // Compter par zone
+          this.zones[trip.zone] = (this.zones[trip.zone] || 0) + 1;
+
+          this.updatedAt = new Date().toISOString();
+        }
+        toJSON() {
+          return { ...this };
+        }
+      }
+
+      // ===== INTERFACES REPOSITORY =====
+
+      // Interface Repository générique
+      class IRepository {
+        async save(entity) {
+          throw new Error("Not implemented");
+        }
+        async findById(id) {
+          throw new Error("Not implemented");
+        }
+        async findAll(filters = {}) {
+          throw new Error("Not implemented");
+        }
+        async update(id, updates) {
+          throw new Error("Not implemented");
+        }
+        async delete(id) {
+          throw new Error("Not implemented");
+        }
+        async count(filters = {}) {
+          throw new Error("Not implemented");
+        }
+      }
+      // ===== IMPLÉMENTATIONS LOCALSTORAGE =====
+
+      // Repository Course
+      class TripRepository extends IRepository {
+        constructor() {
+          super();
+          this.storageKey = "taxitracker_trips";
+          this.initStorage();
+        }
+        initStorage() {
+          if (!localStorage.getItem(this.storageKey)) {
+            localStorage.setItem(this.storageKey, JSON.stringify([]));
+          }
+        }
+
+        async save(trip) {
+          const trips = await this.findAll();
+          const tripEntity = trip instanceof Trip ? trip : new Trip(trip);
+
+          trips.push(tripEntity.toJSON());
+          localStorage.setItem(this.storageKey, JSON.stringify(trips));
+          console.log("💾 Course sauvegardée:", tripEntity.id);
+          return tripEntity;
+        }
+
+        async findById(id) {
+          const trips = await this.findAll();
+          const tripData = trips.find((t) => t.id === id);
+          return tripData ? new Trip(tripData) : null;
+        }
+        async findAll(filters = {}) {
+          const trips = JSON.parse(
+            localStorage.getItem(this.storageKey) || "[]"
+          );
+
+          if (Object.keys(filters).length === 0) return trips;
+
+          return trips.filter((trip) => {
+            if (filters.date) {
+              const tripDate = new Date(trip.createdAt).toDateString();
+              const filterDate = new Date(filters.date).toDateString();
+              if (tripDate !== filterDate) return false;
+            }
+            if (filters.status && trip.status !== filters.status) return false;
+            return true;
+          });
+        }
+        async update(id, updates) {
+          const trips = await this.findAll();
+          const index = trips.findIndex((t) => t.id === id);
+
+          if (index === -1) throw new Error(`Course ${id} non trouvée`);
+
+          trips[index] = {
+            ...trips[index],
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(this.storageKey, JSON.stringify(trips));
+          return new Trip(trips[index]);
+        }
+
+        async count(filters = {}) {
+          const trips = await this.findAll(filters);
+          return trips.length;
+        }
+        async exportCSV() {
+          const trips = await this.findAll();
+          if (!trips.length) return "Aucune course enregistrée";
+
+          const headers = [
+            "Date",
+            "Heure",
+            "Montant",
+            "Passagers",
+            "Distance",
+            "Durée",
+            "Zone",
+            "Statut",
+          ];
+          const rows = trips.map((trip) => [
+            new Date(trip.createdAt).toLocaleDateString("fr-FR"),
+            new Date(trip.createdAt).toLocaleTimeString("fr-FR"),
+            trip.amount + " FCFA",
+            trip.passengers,
+            (trip.distance || 0).toFixed(2) + " km",
+            Math.round((trip.duration || 0) / 60) + " min",
+            trip.zone,
+            trip.status,
+          ]);
+
+          return [headers, ...rows].map((row) => row.join(";")).join("\n");
+        }
+      }
+      // Repository GPS
+      class GPSRepository extends IRepository {
+        constructor() {
+          super();
+          this.storageKey = "taxitracker_gps";
+          this.maxPoints = 5000;
+          this.initStorage();
+        }
+
+        initStorage() {
+          if (!localStorage.getItem(this.storageKey)) {
+            localStorage.setItem(this.storageKey, JSON.stringify([]));
+          }
+        }
+
+        async save(point) {
+          const points = await this.findAll();
+          const pointEntity =
+            point instanceof GPSPoint ? point : new GPSPoint(point);
+
+          points.push(pointEntity.toJSON());
+
+          // Limiter le nombre de points
+          if (points.length > this.maxPoints) {
+            points.splice(0, points.length - this.maxPoints);
+          }
+          localStorage.setItem(this.storageKey, JSON.stringify(points));
+          return pointEntity;
+        }
+
+        async findAll(filters = {}) {
+          const points = JSON.parse(
+            localStorage.getItem(this.storageKey) || "[]"
+          );
+
+          if (Object.keys(filters).length === 0) return points;
+
+          return points.filter((point) => {
+            if (filters.tripId && point.tripId !== filters.tripId) return false;
+            if (filters.date) {
+              const pointDate = new Date(point.timestamp).toDateString();
+              const filterDate = new Date(filters.date).toDateString();
+              if (pointDate !== filterDate) return false;
+            }
+            return true;
+          });
+        }
+        async findByTripId(tripId) {
+          return this.findAll({ tripId });
+        }
+
+        async clearOldPoints(daysToKeep = 30) {
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+          const points = await this.findAll();
+          const filteredPoints = points.filter(
+            (point) => new Date(point.timestamp) > cutoffDate
+          );
+
+          localStorage.setItem(this.storageKey, JSON.stringify(filteredPoints));
+          console.log(
+            `🧹 ${points.length - filteredPoints.length} points GPS supprimés`
+          );
+        }
+      }
+      // Repository Statistiques
+      class StatsRepository extends IRepository {
+        constructor() {
+          super();
+          this.storageKey = "taxitracker_stats";
+          this.initStorage();
+        }
+
+        initStorage() {
+          if (!localStorage.getItem(this.storageKey)) {
+            localStorage.setItem(this.storageKey, JSON.stringify([]));
+          }
+        }
+        async save(stats) {
+          const allStats = await this.findAll();
+          const statsEntity =
+            stats instanceof DailyStats ? stats : new DailyStats(stats);
+
+          // Remplacer si existe déjà pour cette date
+          const existingIndex = allStats.findIndex(
+            (s) => s.date === statsEntity.date
+          );
+          if (existingIndex >= 0) {
+            allStats[existingIndex] = statsEntity.toJSON();
+          } else {
+            allStats.push(statsEntity.toJSON());
+          }
+
+          localStorage.setItem(this.storageKey, JSON.stringify(allStats));
+          return statsEntity;
+        }
+        async findByDate(date) {
+          const dateStr =
+            typeof date === "string" ? date : date.toISOString().split("T")[0];
+          const allStats = await this.findAll();
+          const statsData = allStats.find((s) => s.date === dateStr);
+          return statsData ? new DailyStats(statsData) : null;
+        }
+
+        async findAll() {
+          return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+        }
+
+        async getOrCreateToday() {
+          const today = new Date().toISOString().split("T")[0];
+          let stats = await this.findByDate(today);
+
+          if (!stats) {
+            stats = new DailyStats({ date: today });
+            await this.save(stats);
+          }
+
+          return stats;
+        }
+      }
+      // ===== INSTANCES GLOBALES =====
+      const tripRepository = new TripRepository();
+      const gpsRepository = new GPSRepository();
+      const statsRepository = new StatsRepository();
+
       // ===== GPS TRACKING SYSTEM SIMPLIFIÉ =====
 
       // Configuration GPS
@@ -2009,11 +2407,25 @@
         resultModal.classList.remove("flex");
       });
 
-      // Start trip
-      function startTrip() {
+      // Start trip avec sauvegarde
+      async function startTrip() {
         appState.tripStartTime = Date.now();
 
-        // Update UI
+        try {
+          const savedTrip = await tripRepository.save({
+            amount: appState.currentTrip.amount,
+            passengers: appState.currentTrip.passengers,
+            startPosition: appState.currentPosition,
+            startTime: appState.tripStartTime,
+            status: "active",
+          });
+          appState.currentTrip.id = savedTrip.id;
+          console.log("💾 Course sauvegardée:", savedTrip.id);
+        } catch (error) {
+          console.error("❌ Erreur sauvegarde:", error);
+        }
+
+        // Update UI (reste identique)
         document.getElementById("current-amount").textContent =
           appState.currentTrip.amount.toLocaleString() + " FCFA";
         document.getElementById("current-distance").textContent = "0.0 km";
@@ -2021,14 +2433,9 @@
 
         currentTripCard.classList.remove("hidden");
         updateStatusBadge("En course", "bg-blue-500 text-white");
-
-        // Start trip timer
         startTripTimer();
-
-        // Stop periodic verification while on trip
         stopPeriodicVerification();
       }
-
       // Trip timer
       function startTripTimer() {
         const timer = setInterval(() => {
@@ -2146,23 +2553,23 @@
       // Service Worker Registration avec code inline
       if ("serviceWorker" in navigator) {
         const swCode = `
-          const CACHE_NAME = 'taxitracker-v2';
-          const urlsToCache = ['/'];
-          
-          self.addEventListener('install', (event) => {
-            event.waitUntil(
-              caches.open(CACHE_NAME)
-                .then((cache) => cache.addAll(urlsToCache))
-            );
-          });
-          
-          self.addEventListener('fetch', (event) => {
-            event.respondWith(
-              caches.match(event.request)
-                .then((response) => response || fetch(event.request))
-            );
-          });
-        `;
+                                                                        const CACHE_NAME = 'taxitracker-v2';
+                                                                        const urlsToCache = ['/'];
+
+                                                                        self.addEventListener('install', (event) => {
+                                                                          event.waitUntil(
+                                                                            caches.open(CACHE_NAME)
+                                                                              .then((cache) => cache.addAll(urlsToCache))
+                                                                          );
+                                                                        });
+
+                                                                        self.addEventListener('fetch', (event) => {
+                                                                          event.respondWith(
+                                                                            caches.match(event.request)
+                                                                              .then((response) => response || fetch(event.request))
+                                                                          );
+                                                                        });
+                                                                      `;
 
         const blob = new Blob([swCode], { type: "application/javascript" });
         const swUrl = URL.createObjectURL(blob);
@@ -2218,6 +2625,116 @@
         document
           .getElementById("zoom-rue")
           .addEventListener("click", () => applyZoom("rue"));
+
+        // Gestion des données
+        document
+          .getElementById("export-csv-btn")
+          .addEventListener("click", async () => {
+            try {
+              const csvData = await tripRepository.exportCSV();
+              downloadFile(csvData, "mes-courses.csv", "text/csv");
+              console.log("📊 Export CSV réussi");
+            } catch (error) {
+              alert("Erreur export CSV: " + error.message);
+            }
+          });
+        document
+          .getElementById("view-history-btn")
+          .addEventListener("click", async () => {
+            try {
+              await showTripHistory();
+            } catch (error) {
+              alert("Erreur historique: " + error.message);
+            }
+          });
+        document
+          .getElementById("clear-data-btn")
+          .addEventListener("click", async () => {
+            if (
+              confirm(
+                "⚠️ Effacer toutes les données sauvegardées ?\n\nCette action est irréversible."
+              )
+            ) {
+              localStorage.clear();
+              console.log("🗑️ Toutes les données effacées");
+              location.reload();
+            }
+          });
+        // Fonction utilitaire pour télécharger
+        function downloadFile(content, filename, contentType) {
+          const blob = new Blob([content], { type: contentType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          console.log("💾 Fichier téléchargé:", filename);
+        }
+        // Afficher historique des courses
+        async function showTripHistory() {
+          const trips = await tripRepository.findAll();
+          const completedTrips = trips
+            .filter((t) => t.status === "completed")
+            .slice(-10); // 10 dernières
+
+          if (completedTrips.length === 0) {
+            alert("Aucune course terminée dans l'historique");
+            return;
+          }
+
+          let historyText = "📋 HISTORIQUE DES COURSES\n\n";
+          completedTrips.reverse().forEach((trip, index) => {
+            const date = new Date(trip.createdAt).toLocaleDateString("fr-FR");
+            const time = new Date(trip.createdAt).toLocaleTimeString("fr-FR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            historyText += `${index + 1}. ${date} ${time}\n`;
+            historyText += `   💰 ${trip.amount} FCFA | 👥 ${trip.passengers} pass.\n`;
+            historyText += `   📍 ${trip.distance.toFixed(
+              1
+            )}km | ⏱️ ${Math.round(trip.duration / 60)}min\n\n`;
+          });
+
+          alert(historyText);
+        }
+
+        // Mettre à jour le compteur de données
+        async function updateDataCount() {
+          try {
+            const tripCount = await tripRepository.count();
+            const gpsCount = (await gpsRepository.findAll()).length;
+            document.getElementById(
+              "data-count"
+            ).textContent = `${tripCount} courses, ${gpsCount} GPS`;
+          } catch (error) {
+            document.getElementById("data-count").textContent =
+              "Erreur données";
+            console.error("❌ Erreur compteur:", error);
+          }
+        }
+
+        // Mettre à jour les statistiques quotidiennes
+        async function updateDailyStats() {
+          try {
+            const todayStats = await statsRepository.getOrCreateToday();
+
+            // Mettre à jour l'affichage
+            document.getElementById("daily-earnings").textContent =
+              todayStats.totalEarnings.toLocaleString();
+            document.getElementById("trip-count").textContent =
+              todayStats.tripCount;
+
+            console.log("📊 Stats mises à jour:", todayStats.date);
+          } catch (error) {
+            console.error("❌ Erreur stats:", error);
+          }
+        }
+
+        // Appeler au chargement
+        updateDataCount();
+        updateDailyStats();
 
         // Test GPS disponibilité
         if (navigator.geolocation) {

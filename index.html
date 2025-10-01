@@ -913,6 +913,250 @@
       const gpsRepository = new GPSRepository();
       const statsRepository = new StatsRepository();
 
+      // ===== SYSTÈME DE ZONES GÉOGRAPHIQUES =====
+
+      // Définition des zones autorisées
+      const AUTHORIZED_ZONES = {
+        "pointe-noire": {
+          name: "Pointe-Noire",
+          center: { lat: -4.7692, lng: 11.8636 },
+          radius: 25000, // 25km de rayon
+          districts: [
+            { name: "Centre-ville", lat: -4.7692, lng: 11.8636, radius: 3000 },
+            { name: "Tié-Tié", lat: -4.75, lng: 11.85, radius: 2000 },
+            { name: "Loandjili", lat: -4.8, lng: 11.88, radius: 2500 },
+            { name: "Mongo-Mpoukou", lat: -4.73, lng: 11.84, radius: 2000 },
+            { name: "Ngoyo", lat: -4.78, lng: 11.9, radius: 1500 },
+            { name: "Vindoulou", lat: -4.74, lng: 11.87, radius: 1800 },
+            { name: "Mpita", lat: -4.76, lng: 11.85, radius: 1500 },
+          ],
+        },
+      };
+
+      // Villes voisines pour référence
+      const NEARBY_CITIES = [
+        { name: "Dolisie", lat: -4.1989, lng: 12.6664 },
+        { name: "Brazzaville", lat: -4.2634, lng: 15.2429 },
+        { name: "Cabinda", lat: -5.55, lng: 12.2 },
+        { name: "Luanda", lat: -8.839, lng: 13.2894 },
+        { name: "Soyo", lat: -6.1364, lng: 12.3681 },
+        { name: "Nzeto", lat: -7.2317, lng: 12.8644 },
+      ];
+
+      // État de la zone actuelle
+      let currentZoneStatus = {
+        city: "Localisation...",
+        district: null,
+        authorized: false,
+        distance: 0,
+        lastUpdate: null,
+      };
+
+      // Détecter la zone actuelle
+      function detectCurrentZone(lat, lng) {
+        console.log(
+          `🌍 Détection zone pour: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+        );
+
+        // Vérifier Pointe-Noire
+        const pnZone = AUTHORIZED_ZONES["pointe-noire"];
+        const distanceToPN = calculateDistance(
+          lat,
+          lng,
+          pnZone.center.lat,
+          pnZone.center.lng
+        );
+
+        if (distanceToPN <= pnZone.radius) {
+          // Dans Pointe-Noire - détecter le quartier
+          let closestDistrict = null;
+          let minDistance = Infinity;
+
+          pnZone.districts.forEach((district) => {
+            const distanceToDistrict = calculateDistance(
+              lat,
+              lng,
+              district.lat,
+              district.lng
+            );
+            if (
+              distanceToDistrict <= district.radius &&
+              distanceToDistrict < minDistance
+            ) {
+              minDistance = distanceToDistrict;
+              closestDistrict = district.name;
+            }
+          });
+          currentZoneStatus = {
+            city: "Pointe-Noire",
+            district: closestDistrict || "Zone périphérique",
+            authorized: true,
+            distance: Math.round((distanceToPN / 1000) * 10) / 10,
+            lastUpdate: Date.now(),
+          };
+
+          console.log("✅ Zone autorisée:", currentZoneStatus);
+          return currentZoneStatus;
+        }
+
+        // Vérifier villes voisines
+        let closestCity = null;
+        let minCityDistance = Infinity;
+
+        NEARBY_CITIES.forEach((city) => {
+          const distance = calculateDistance(lat, lng, city.lat, city.lng);
+          if (distance < minCityDistance) {
+            minCityDistance = distance;
+            closestCity = city.name;
+          }
+        });
+        // Si proche d'une ville connue (< 50km)
+        if (minCityDistance < 50000) {
+          currentZoneStatus = {
+            city: closestCity,
+            district: null,
+            authorized: false,
+            distance: Math.round((distanceToPN / 1000) * 10) / 10,
+            lastUpdate: Date.now(),
+          };
+        } else {
+          // Zone inconnue
+          currentZoneStatus = {
+            city: "Zone inconnue",
+            district: null,
+            authorized: false,
+            distance: Math.round((distanceToPN / 1000) * 10) / 10,
+            lastUpdate: Date.now(),
+          };
+        }
+
+        console.log("❌ Zone non autorisée:", currentZoneStatus);
+        return currentZoneStatus;
+      }
+
+      // Mettre à jour l'affichage de la zone
+      function updateZoneDisplay() {
+        console.log("🖥️ Mise à jour affichage zone...");
+
+        // Trouver le conteneur de zone par son contenu
+        const allContainers = document.querySelectorAll(
+          ".bg-gray-800.rounded-xl.p-4.shadow-lg"
+        );
+        let zoneContainer = null;
+
+        allContainers.forEach((container) => {
+          const text = container.textContent;
+          if (
+            text.includes("Zone") ||
+            text.includes("📍") ||
+            text.includes("Pointe-Noire")
+          ) {
+            zoneContainer = container;
+          }
+        });
+        if (!zoneContainer) {
+          console.warn("⚠️ Conteneur de zone non trouvé");
+          return;
+        }
+        // Reconstruire le contenu de la zone
+        if (currentZoneStatus.authorized) {
+          // Zone autorisée - vert
+          zoneContainer.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <span class="text-2xl">📍</span>
+                <div>
+                  <p class="font-medium">${currentZoneStatus.city}</p>
+                  <p class="text-sm text-green-400">
+                    ${
+                      currentZoneStatus.district
+                        ? currentZoneStatus.district + " • "
+                        : ""
+                    }Zone autorisée
+                  </p>
+                </div>
+              </div>
+              <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+            </div>
+          `;
+        } else {
+          // Zone non autorisée - rouge
+          zoneContainer.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <span class="text-2xl">⚠️</span>
+                <div>
+                  <p class="font-medium">${currentZoneStatus.city}</p>
+                  <p class="text-sm text-red-400">
+                    Zone non autorisée • ${currentZoneStatus.distance}km de Pointe-Noire
+                  </p>
+                </div>
+              </div>
+              <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+            </div>
+          `;
+
+          // Alerte si en service dans une zone non autorisée
+          if (
+            appState.dayStarted &&
+            !appState.paused &&
+            !appState.currentTrip
+          ) {
+            addFraudAlert(`Service actif hors zone: ${currentZoneStatus.city}`);
+          }
+        }
+        console.log("✅ Affichage zone mis à jour:", currentZoneStatus.city);
+      }
+      // Vérification périodique de la zone
+      function startZoneMonitoring() {
+        console.log("🔄 Démarrage monitoring des zones...");
+
+        setInterval(() => {
+          if (appState.currentPosition && appState.dayStarted) {
+            const previousCity = currentZoneStatus.city;
+            const previousAuthorized = currentZoneStatus.authorized;
+
+            detectCurrentZone(
+              appState.currentPosition.lat,
+              appState.currentPosition.lng
+            );
+
+            // Mettre à jour si changement significatif
+            if (
+              currentZoneStatus.city !== previousCity ||
+              currentZoneStatus.authorized !== previousAuthorized
+            ) {
+              updateZoneDisplay();
+
+              // Log du changement de zone
+              if (
+                previousCity !== "Localisation..." &&
+                currentZoneStatus.city !== previousCity
+              ) {
+                console.log(
+                  `🚗 Changement de zone: ${previousCity} → ${currentZoneStatus.city}`
+                );
+              }
+            }
+          }
+        }, 15000); // Vérifier toutes les 15 secondes
+      }
+
+      // Initialiser l'affichage de zone au démarrage
+      function initializeZoneDisplay() {
+        console.log("🏁 Initialisation affichage zone...");
+
+        // Affichage initial
+        currentZoneStatus = {
+          city: "Localisation...",
+          district: null,
+          authorized: false,
+          distance: 0,
+          lastUpdate: null,
+        };
+
+        updateZoneDisplay();
+      }
       // ===== GPS TRACKING SYSTEM SIMPLIFIÉ =====
 
       // Configuration GPS
@@ -928,6 +1172,7 @@
         banlieue: { base: 300, perKm: 250, perMin: 15 },
         aeroport: { base: 1000, perKm: 500, perMin: 30 },
         port: { base: 800, perKm: 350, perMin: 20 },
+        "hors-zone": { base: 1500, perKm: 800, perMin: 50 }, // NOUVEAU - Tarif majoré
         default: { base: 400, perKm: 300, perMin: 20 },
       };
 
@@ -1870,10 +2115,15 @@
         // Mettre à jour UI
         updateGPSDisplay(point);
 
+        // Détecter et mettre à jour la zone géographique
+        detectCurrentZone(point.lat, point.lng);
+        updateZoneDisplay();
+
         // Ajouter à la carte si visible
         if (mapState.visible) {
           addPointToMap(point.lat, point.lng, "current");
         }
+        addPointToMap(point.lat, point.lng, "current");
 
         console.log(
           "✅ Point GPS traité - Buffer:",
@@ -1938,16 +2188,26 @@
 
       // Détecter zone tarifaire (simulation basique)
       function detectPricingZone(lat, lng) {
-        // Coordonnées approximatives Pointe-Noire
-        const centerLat = -4.7692;
-        const centerLng = 11.8636;
+        // Utiliser la détection de zone existante
+        const zoneInfo = detectCurrentZone(lat, lng);
 
-        const distance = calculateDistance(centerLat, centerLng, lat, lng);
+        if (!zoneInfo.authorized) {
+          return "hors-zone"; // Tarif majoré hors zone
+        }
 
-        if (distance < 3000) return "centre-ville";
-        if (distance < 8000) return "banlieue";
-        if (distance > 15000) return "aeroport";
-        return "default";
+        // Tarifs selon le quartier à Pointe-Noire
+        switch (zoneInfo.district) {
+          case "Centre-ville":
+            return "centre-ville";
+          case "Tié-Tié":
+            return "banlieue";
+          case "Loandjili":
+            return "port";
+          case "Ngoyo":
+            return "aeroport";
+          default:
+            return "default";
+        }
       }
 
       // ===== DÉTECTION DE FRAUDE =====
@@ -2532,23 +2792,23 @@
       // Service Worker Registration avec code inline
       if ("serviceWorker" in navigator) {
         const swCode = `
-                                                                        const CACHE_NAME = 'taxitracker-v2';
-                                                                        const urlsToCache = ['/'];
+                                                                                    const CACHE_NAME = 'taxitracker-v2';
+                                                                                    const urlsToCache = ['/'];
 
-                                                                        self.addEventListener('install', (event) => {
-                                                                          event.waitUntil(
-                                                                            caches.open(CACHE_NAME)
-                                                                              .then((cache) => cache.addAll(urlsToCache))
-                                                                          );
-                                                                        });
+                                                                                    self.addEventListener('install', (event) => {
+                                                                                      event.waitUntil(
+                                                                                        caches.open(CACHE_NAME)
+                                                                                          .then((cache) => cache.addAll(urlsToCache))
+                                                                                      );
+                                                                                    });
 
-                                                                        self.addEventListener('fetch', (event) => {
-                                                                          event.respondWith(
-                                                                            caches.match(event.request)
-                                                                              .then((response) => response || fetch(event.request))
-                                                                          );
-                                                                        });
-                                                                      `;
+                                                                                    self.addEventListener('fetch', (event) => {
+                                                                                      event.respondWith(
+                                                                                        caches.match(event.request)
+                                                                                          .then((response) => response || fetch(event.request))
+                                                                                      );
+                                                                                    });
+                                                                                  `;
 
         const blob = new Blob([swCode], { type: "application/javascript" });
         const swUrl = URL.createObjectURL(blob);
@@ -2651,6 +2911,30 @@
         document
           .getElementById("clear-map")
           .addEventListener("click", clearMap);
+
+        // Démarrer le monitoring des zones
+        startZoneMonitoring();
+
+        // Test initial de zone si GPS déjà disponible
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              detectCurrentZone(
+                position.coords.latitude,
+                position.coords.longitude
+              );
+              updateZoneDisplay();
+              console.log("🌍 Zone initiale détectée");
+            },
+            (error) => {
+              console.log(
+                "⚠️ Impossible de détecter la zone initiale:",
+                error.message
+              );
+            },
+            { timeout: 5000, maximumAge: 60000 }
+          );
+        }
       });
     </script>
     <script>

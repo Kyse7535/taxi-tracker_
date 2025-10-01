@@ -3199,7 +3199,7 @@
       // Charger et afficher l'historique
       async function loadTripHistory() {
         try {
-          const trips = await tripRepository.getAll();
+          const trips = await tripRepository.findAll();
           const completedTrips = trips.filter(
             (trip) => trip.status === "completed"
           );

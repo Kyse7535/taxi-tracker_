@@ -2231,7 +2231,7 @@
             .map((trip) => {
               const startDate = new Date(trip.startTime);
               const duration = Math.round(trip.duration / 60000); // en minutes
-              const distance = (trip.distance / 1000).toFixed(1); // en km
+              const distance = trip.distance; // en km
               return `
         <div class="bg-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-600 transition-colors" 
              onclick="showTripDetails('${trip.id}')">

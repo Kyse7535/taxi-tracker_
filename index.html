@@ -1396,6 +1396,7 @@
         if (appState.currentTrip) {
           appState.tripPoints.push(point);
           updateTripDistance();
+          alert(appState.tripPoints.length);
           console.log(
             "🚗 Point ajouté à la course, total:",
             appState.tripPoints.length
@@ -1731,11 +1732,8 @@
 
       // Declare trip avec estimation prix
       declareTripBtn.addEventListener("click", () => {
-        alert("cc 1");
         if (!appState.dayStarted || appState.paused) return;
 
-        alert("cc2");
-        alert("cc3");
         tripModal.classList.remove("hidden");
         tripModal.classList.add("flex");
         // Reset inputs

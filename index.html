@@ -425,13 +425,13 @@
       <div class="bg-gray-800 rounded-xl p-4 shadow-lg">
         <div class="flex items-center justify-between mb-2">
           <span class="font-medium">Score de confiance</span>
-          <span id="trust-score" class="text-green-400 font-bold">94%</span>
+          <span id="trust-score" class="text-green-400 font-bold">100%</span>
         </div>
         <div class="w-full bg-gray-700 rounded-full h-2">
           <div
             id="trust-bar"
             class="bg-green-400 h-2 rounded-full"
-            style="width: 94%"
+            style="width: 100%"
           ></div>
         </div>
         <p class="text-xs text-gray-400 mt-1">
@@ -1456,10 +1456,8 @@
 
       // Calculer distance totale du trip
       function calculateTripDistance() {
-        alert("start calcaul distance");
         if (appState.tripPoints.length < 2) return 0;
 
-        alert("start calcaul distance 2");
         let totalDistance = 0;
         for (let i = 1; i < appState.tripPoints.length; i++) {
           const prev = appState.tripPoints[i - 1];
@@ -1471,7 +1469,6 @@
             curr.lng
           );
         }
-        alert("start calcaul distance end");
 
         return totalDistance / 1000; // en kilomètres
       }

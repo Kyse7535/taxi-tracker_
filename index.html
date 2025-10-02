@@ -1965,12 +1965,12 @@
             : "default";
           const finalEstimatedPrice = 0;
           try {
-            alert("distance: " + finalDistance);
+            alert("distance: " + finalDistance.toFixed(2));
             // Mettre à jour la course dans la base
             await tripRepository.update(appState.currentTrip.id, {
               endPosition: appState.currentPosition,
               endTime: Date.now(),
-              distance: finalDistance,
+              distance: finalDistance.toFixed(2),
               duration: finalDuration * 60000, // en millisecondes
               zone: zone,
               estimatedPrice: finalEstimatedPrice,
@@ -1980,7 +1980,7 @@
             const todayStats = await statsRepository.getOrCreateToday();
             todayStats.updateFromTrip({
               amount: appState.currentTrip.amount,
-              distance: finalDistance,
+              distance: finalDistance.toFixed(2),
               duration: finalDuration * 60000,
               zone: zone,
               fraudAlerts: appState.suspiciousEvents.filter(

@@ -1733,7 +1733,6 @@
       declareTripBtn.addEventListener("click", () => {
         if (!appState.dayStarted || appState.paused) return;
 
-        alert("cc");
         // Estimer prix basé sur position actuelle
         if (appState.currentPosition) {
           const zone = detectPricingZone(
@@ -1745,7 +1744,7 @@
             "estimated-price"
           ).textContent = `${baseEstimate}+ FCFA (base ${zone})`;
         }
-
+        alert("cc");
         tripModal.classList.remove("hidden");
         tripModal.classList.add("flex");
         // Reset inputs

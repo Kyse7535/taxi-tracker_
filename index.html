@@ -1813,6 +1813,10 @@
             return;
           }
 
+          setButtonState(declareTripBtn, false);
+          setButtonState(pauseBtn, false);
+          setButtonState(startDayBtn, false);
+
           appState.currentTrip = {
             amount: parseInt(amount),
             passengers: parseInt(passengers),

@@ -1275,7 +1275,7 @@
         // Fraud Detection
         suspiciousEvents: [],
         lastSpeedCheck: null,
-        trustScore: 94,
+        trustScore: 100,
       };
 
       // ===== UTILITAIRES GPS =====
@@ -1410,7 +1410,6 @@
         if (appState.currentTrip) {
           appState.tripPoints.push(point);
           updateTripDistance();
-          alert(appState.tripPoints.length);
           console.log(
             "🚗 Point ajouté à la course, total:",
             appState.tripPoints.length
@@ -1523,7 +1522,7 @@
         });
 
         // Réduire score de confiance
-        appState.trustScore = Math.max(0, appState.trustScore - 5);
+        appState.trustScore = Math.max(0, appState.trustScore - 0.001);
         updateTrustScore();
 
         console.warn("🚨 FRAUDE DÉTECTÉE:", message);
@@ -1955,14 +1954,12 @@
       document
         .getElementById("end-trip-btn")
         .addEventListener("click", async () => {
-          alert("start ending");
           if (!appState.currentTrip) return;
 
-          alert("start ending 2");
           // Analyse finale de la course
           const finalDistance = calculateTripDistance();
           const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
-          alert("current position: " + appState.currentPosition.lat);
+
           const zone = appState.currentPosition
             ? detectPricingZone(
                 appState.currentPosition.lat,

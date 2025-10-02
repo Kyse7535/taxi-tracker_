@@ -1735,17 +1735,6 @@
         if (!appState.dayStarted || appState.paused) return;
 
         alert("cc2");
-        // Estimer prix basé sur position actuelle
-        if (appState.currentPosition) {
-          const zone = detectPricingZone(
-            appState.currentPosition.lat,
-            appState.currentPosition.lng
-          );
-          const baseEstimate = PRICING_ZONES[zone].base;
-          document.getElementById(
-            "estimated-price"
-          ).textContent = `${baseEstimate}+ FCFA (base ${zone})`;
-        }
         alert("cc3");
         tripModal.classList.remove("hidden");
         tripModal.classList.add("flex");

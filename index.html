@@ -1443,8 +1443,10 @@
 
       // Calculer distance totale du trip
       function calculateTripDistance() {
+        alert("start calcaul distance");
         if (appState.tripPoints.length < 2) return 0;
 
+        alert("start calcaul distance 2");
         let totalDistance = 0;
         for (let i = 1; i < appState.tripPoints.length; i++) {
           const prev = appState.tripPoints[i - 1];
@@ -1456,6 +1458,7 @@
             curr.lng
           );
         }
+        alert("start calcaul distance end");
 
         return totalDistance / 1000; // en kilomètres
       }

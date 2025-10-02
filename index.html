@@ -1938,24 +1938,23 @@
       document
         .getElementById("end-trip-btn")
         .addEventListener("click", async () => {
+          alert("start ending");
           if (!appState.currentTrip) return;
 
+          alert("start ending 2");
           // Analyse finale de la course
           const finalDistance = calculateTripDistance();
           const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
+          alert("current position: " + appState.currentPosition.lat);
           const zone = appState.currentPosition
             ? detectPricingZone(
                 appState.currentPosition.lat,
                 appState.currentPosition.lng
               )
             : "default";
-          const finalEstimatedPrice = estimatePrice(
-            finalDistance,
-            finalDuration,
-            zone
-          );
+          const finalEstimatedPrice = 0;
           try {
-            alert(finalDistance);
+            alert("distance: " + finalDistance);
             // Mettre à jour la course dans la base
             await tripRepository.update(appState.currentTrip.id, {
               endPosition: appState.currentPosition,

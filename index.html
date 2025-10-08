@@ -1334,6 +1334,46 @@
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
       }
+      // ===== UTILITAIRE : POSITION AVEC SECOURS =====
+      function getValidPositionWithFallback() {
+        const now = Date.now();
+        const current = appState.currentPosition;
+        const lastValid = appState.lastValidPosition;
+
+        // Cas 1 : position actuelle valide
+        if (current && current.accuracy <= 1000) {
+          return {
+            position: { ...current },
+            source: "current",
+            isApproximate: false,
+          };
+        }
+
+        // Cas 2 : dernière position valide < 30s et précise
+        if (
+          lastValid &&
+          now - lastValid.timestamp < 30000 &&
+          lastValid.accuracy <= 1000
+        ) {
+          return {
+            position: { ...lastValid },
+            source: "recent",
+            isApproximate: true,
+          };
+        }
+
+        // Cas 3 : fallback Pointe-Noire
+        return {
+          position: {
+            lat: -4.7692,
+            lng: 11.8636,
+            accuracy: 500,
+            timestamp: now,
+          },
+          source: "fallback",
+          isApproximate: true,
+        };
+      }
 
       // ===== SYSTÈME DE CARTE GPS =====
 
@@ -1425,6 +1465,12 @@
           return;
         }
 
+        // Rejeter positions trop imprécises
+        if (accuracy == null || accuracy > 1000) {
+          console.warn("❌ Position GPS rejetée : précision > 1000m");
+          return;
+        }
+
         // Créer le point GPS
         const point = {
           lat: latitude,
@@ -1435,6 +1481,8 @@
           heading: position.coords.heading || 0,
           provider: "html5",
         };
+
+        point.timestamp = Date.now();
 
         appState.currentPosition = point;
         appState.lastValidPosition = point;
@@ -1817,17 +1865,19 @@
           setButtonState(pauseBtn, false);
           setButtonState(startDayBtn, false);
 
+          const startPosInfo = getValidPositionWithFallback();
+
           appState.currentTrip = {
             amount: parseInt(amount),
             passengers: parseInt(passengers),
-            startPosition: appState.currentPosition,
+            startPosition: startPosInfo.position,
             startTime: Date.now(),
           };
 
           // Réinitialiser points du trip
           appState.tripPoints = [];
-          if (appState.currentPosition) {
-            appState.tripPoints.push(appState.currentPosition);
+          if (startPosInfo.position) {
+            appState.tripPoints.push(startPosInfo.position);
           }
 
           tripModal.classList.add("hidden");
@@ -2012,11 +2062,12 @@
           try {
             alert("distance: " + finalDistance.toFixed(2));
             // Mettre à jour la course dans la base
+            const endPosInfo = getValidPositionWithFallback();
             await tripRepository.update(appState.currentTrip.id, {
-              endPosition: appState.currentPosition,
+              endPosition: endPosInfo.position,
               endTime: Date.now(),
               distance: finalDistance.toFixed(2),
-              duration: finalDuration * 60000, // en millisecondes
+              duration: finalDuration * 60000,
               zone: zone,
               estimatedPrice: finalEstimatedPrice,
               status: "completed",
@@ -2345,18 +2396,28 @@
           document.getElementById("detail-date").textContent =
             startDate.toLocaleDateString();
           // Positions
+          function formatPositionDisplay(pos, refTime) {
+            if (!pos) return "Position non enregistrée";
+            const now = Date.now();
+            const ageMs = now - (pos.timestamp || refTime);
+            const ageMin = Math.floor(ageMs / 60000);
+            const ageLabel =
+              ageMin > 0 ? `il y a ${ageMin} min` : "à l'instant";
+            const accuracyLabel = pos.accuracy
+              ? `±${Math.round(pos.accuracy)}m`
+              : "";
+            const approxLabel = !pos.timestamp ? " (approximative)" : "";
+            return `${pos.lat.toFixed(4)}, ${pos.lng.toFixed(
+              4
+            )} • ${accuracyLabel} ${ageLabel}${approxLabel}`;
+          }
+
           document.getElementById("detail-start-position").textContent =
-            trip.startPosition
-              ? `${trip.startPosition.lat.toFixed(
-                  6
-                )}, ${trip.startPosition.lng.toFixed(6)}`
-              : "Non disponible";
+            formatPositionDisplay(trip.startPosition, trip.startTime);
           document.getElementById("detail-end-position").textContent =
             trip.endPosition
-              ? `${trip.endPosition.lat.toFixed(
-                  6
-                )}, ${trip.endPosition.lng.toFixed(6)}`
-              : "Non disponible";
+              ? formatPositionDisplay(trip.endPosition, trip.endTime)
+              : "Non terminée";
           // Alertes
           const alertsSection = document.getElementById(
             "detail-alerts-section"

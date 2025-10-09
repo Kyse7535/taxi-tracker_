@@ -610,33 +610,151 @@
     </main>
 
     <script>
+      // ===== ENTITÉ USER =====
+      class User {
+        constructor(data = {}) {
+          this.id = data.id || null;
+          this.email = data.email || "";
+          this.role = data.role || "driver"; // 'driver', 'owner', 'admin'
+          this.nom = data.nom || "";
+          this.prenom = data.prenom || "";
+          this.age = data.age || null;
+          this.phone = data.phone || "";
+          this.createdAt = data.createdAt
+            ? new Date(data.createdAt)
+            : new Date();
+        }
+
+        toJSON() {
+          return {
+            id: this.id,
+            email: this.email,
+            role: this.role,
+            nom: this.nom,
+            prenom: this.prenom,
+            age: this.age,
+            phone: this.phone,
+            createdAt: this.createdAt.toISOString(),
+          };
+        }
+
+        static fromJSON(json) {
+          if (!json) return null;
+          return new User({
+            id: json.id,
+            email: json.email,
+            role: json.role,
+            nom: json.nom,
+            prenom: json.prenom,
+            age: json.age,
+            phone: json.phone,
+            createdAt: json.createdAt,
+          });
+        }
+      }
+      // ===== ENTITÉ DRIVER =====
+      class Driver extends User {
+        constructor(data = {}) {
+          super(data);
+          this.ownerId = data.ownerId || null;
+          this.licenseNumber = data.licenseNumber || "";
+          this.vehicleId = data.vehicleId || null;
+        }
+
+        toJSON() {
+          return {
+            ...super.toJSON(),
+            ownerId: this.ownerId,
+            licenseNumber: this.licenseNumber,
+            vehicleId: this.vehicleId,
+          };
+        }
+
+        static fromJSON(json) {
+          if (!json) return null;
+          return new Driver({
+            id: json.id,
+            email: json.email,
+            role: json.role,
+            nom: json.nom,
+            prenom: json.prenom,
+            age: json.age,
+            phone: json.phone,
+            ownerId: json.ownerId,
+            licenseNumber: json.licenseNumber,
+            vehicleId: json.vehicleId,
+            createdAt: json.createdAt,
+          });
+        }
+      }
+
+      // ===== ENTITÉ OWNER =====
+      class Owner extends User {
+        constructor(data = {}) {
+          super(data);
+          this.companyName = data.companyName || "";
+          this.taxId = data.taxId || "";
+        }
+
+        toJSON() {
+          return {
+            ...super.toJSON(),
+            companyName: this.companyName,
+            taxId: this.taxId,
+          };
+        }
+
+        static fromJSON(json) {
+          if (!json) return null;
+          return new Owner({
+            id: json.id,
+            email: json.email,
+            role: json.role,
+            nom: json.nom,
+            prenom: json.prenom,
+            age: json.age,
+            phone: json.phone,
+            companyName: json.companyName,
+            taxId: json.taxId,
+            createdAt: json.createdAt,
+          });
+        }
+      }
+
       // ===== ENTITÉS MÉTIER =====
 
       // Entité Course
       class Trip {
         constructor(data = {}) {
-          this.id = data.id || this.generateId();
+          this.id = data.id || this._generateId();
+          this.driverId = data.driverId || null;
+          this.ownerId = data.ownerId || null;
           this.amount = data.amount || 0;
           this.passengers = data.passengers || 1;
-          this.startPosition = data.startPosition || null;
+          this.startPosition = data.startPosition || null; // { lat, lng, accuracy, timestamp }
           this.endPosition = data.endPosition || null;
-          this.startTime = data.startTime || Date.now();
-          this.endTime = data.endTime || null;
-          this.distance = data.distance || 0;
-          this.duration = data.duration || 0;
+          this.gpsPoints = data.gpsPoints || []; // [{ lat, lng, accuracy, timestamp }, ...]
+          this.startTime = data.startTime
+            ? new Date(data.startTime)
+            : new Date();
+          this.endTime = data.endTime ? new Date(data.endTime) : null;
+          this.distance = data.distance || 0; // km
+          this.duration = data.duration || 0; // ms
           this.zone = data.zone || "default";
           this.status = data.status || "active"; // active, completed, cancelled
           this.estimatedPrice = data.estimatedPrice || 0;
-          this.fraudAlerts = data.fraudAlerts || [];
-          this.createdAt = data.createdAt || new Date().toISOString();
-          this.updatedAt = data.updatedAt || null;
+          this.fraudAlerts = Array.isArray(data.fraudAlerts)
+            ? data.fraudAlerts
+            : [];
+          this.createdAt = data.createdAt
+            ? new Date(data.createdAt)
+            : new Date();
+          this.updatedAt = data.updatedAt ? new Date(data.updatedAt) : null;
         }
-        generateId() {
-          return (
-            "trip_" +
-            Date.now().toString(36) +
-            Math.random().toString(36).substr(2)
-          );
+        _generateId() {
+          return `trip_${Date.now().toString(36)}${Math.random()
+            .toString(36)
+            .substr(2, 5)}`;
         }
 
         complete(endPosition, distance, duration) {
@@ -658,20 +776,23 @@
         _serialize() {
           return {
             id: this.id,
+            driverId: this.driverId,
+            ownerId: this.ownerId,
             amount: this.amount,
             passengers: this.passengers,
             startPosition: this.startPosition,
             endPosition: this.endPosition,
-            startTime: this.startTime,
-            endTime: this.endTime,
+            gpsPoints: this.gpsPoints,
+            startTime: this.startTime.toISOString(),
+            endTime: this.endTime ? this.endTime.toISOString() : null,
             distance: this.distance,
             duration: this.duration,
             zone: this.zone,
             status: this.status,
             estimatedPrice: this.estimatedPrice,
             fraudAlerts: this.fraudAlerts,
-            createdAt: this.createdAt,
-            updatedAt: this.updatedAt,
+            createdAt: this.createdAt.toISOString(),
+            updatedAt: this.updatedAt ? this.updatedAt.toISOString() : null,
           };
         }
         // Désérialisation depuis stockage
@@ -686,38 +807,42 @@
       // Entité Point GPS
       class GPSPoint {
         constructor(data = {}) {
-          this.id = data.id || this.generateId();
+          this.id = data.id || this._generateId();
+          this.tripId = data.tripId || null;
+          this.driverId = data.driverId || null;
+          this.ownerId = data.ownerId || null;
           this.lat = data.lat || 0;
           this.lng = data.lng || 0;
-          this.accuracy = data.accuracy || 0;
-          this.speed = data.speed || 0;
-          this.heading = data.heading || 0;
+          this.accuracy = data.accuracy || 0; // mètres
+          this.speed = data.speed || 0; // m/s
+          this.heading = data.heading || 0; // degrés
           this.altitude = data.altitude || 0;
-          this.tripId = data.tripId || null;
+          this.timestamp = data.timestamp
+            ? new Date(data.timestamp)
+            : new Date();
           this.provider = data.provider || "html5";
-          this.timestamp = data.timestamp || new Date().toISOString();
         }
 
-        generateId() {
-          return (
-            "gps_" +
-            Date.now().toString(36) +
-            Math.random().toString(36).substr(2)
-          );
+        _generateId() {
+          return `gps_${Date.now().toString(36)}${Math.random()
+            .toString(36)
+            .substr(2, 5)}`;
         }
         // Sérialisation pour stockage
         _serialize() {
           return {
             id: this.id,
+            tripId: this.tripId,
+            driverId: this.driverId,
+            ownerId: this.ownerId,
             lat: this.lat,
             lng: this.lng,
             accuracy: this.accuracy,
             speed: this.speed,
             heading: this.heading,
             altitude: this.altitude,
-            tripId: this.tripId,
+            timestamp: this.timestamp.toISOString(),
             provider: this.provider,
-            timestamp: this.timestamp,
           };
         }
 
@@ -730,25 +855,83 @@
           return this._serialize();
         }
       }
+      // ===== ENTITÉ FRAUD ALERT =====
+      class FraudAlert {
+        constructor(data = {}) {
+          this.id = data.id || this._generateId();
+          this.tripId = data.tripId || null;
+          this.driverId = data.driverId || null;
+          this.ownerId = data.ownerId || null;
+          this.type = data.type || "unknown"; // 'mismatch_declared_vs_detected', 'unauthorized_zone', etc.
+          this.message = data.message || "";
+          this.proofURL = data.proofURL || null; // URL vers image anonymisée
+          this.timestamp = data.timestamp
+            ? new Date(data.timestamp)
+            : new Date();
+          this.resolved = data.resolved || false;
+          this.resolvedAt = data.resolvedAt ? new Date(data.resolvedAt) : null;
+        }
+
+        _generateId() {
+          return `alert_${Date.now().toString(36)}${Math.random()
+            .toString(36)
+            .substr(2, 5)}`;
+        }
+
+        toJSON() {
+          return {
+            id: this.id,
+            tripId: this.tripId,
+            driverId: this.driverId,
+            ownerId: this.ownerId,
+            type: this.type,
+            message: this.message,
+            proofURL: this.proofURL,
+            timestamp: this.timestamp.toISOString(),
+            resolved: this.resolved,
+            resolvedAt: this.resolvedAt ? this.resolvedAt.toISOString() : null,
+          };
+        }
+
+        static fromJSON(json) {
+          if (!json) return null;
+          return new FraudAlert({
+            id: json.id,
+            tripId: json.tripId,
+            driverId: json.driverId,
+            ownerId: json.ownerId,
+            type: json.type,
+            message: json.message,
+            proofURL: json.proofURL,
+            timestamp: json.timestamp,
+            resolved: json.resolved,
+            resolvedAt: json.resolvedAt,
+          });
+        }
+      }
 
       // Entité Statistiques
       class DailyStats {
         constructor(data = {}) {
-          this.id = data.id || this.generateId();
-          this.date = data.date || new Date().toISOString().split("T")[0];
+          this.id = data.id || this._generateId();
+          this.driverId = data.driverId || null;
+          this.ownerId = data.ownerId || null;
+          this.date = data.date || new Date().toISOString().split("T")[0]; // YYYY-MM-DD
           this.totalEarnings = data.totalEarnings || 0;
           this.tripCount = data.tripCount || 0;
           this.totalDistance = data.totalDistance || 0;
           this.totalDuration = data.totalDuration || 0;
           this.averageTrip = data.averageTrip || 0;
-          this.fraudAlerts = data.fraudAlerts || 0;
+          this.fraudAlertsCount = data.fraudAlertsCount || 0;
           this.zones = data.zones || {};
-          this.createdAt = data.createdAt || new Date().toISOString();
-          this.updatedAt = data.updatedAt || null;
+          this.createdAt = data.createdAt
+            ? new Date(data.createdAt)
+            : new Date();
+          this.updatedAt = data.updatedAt ? new Date(data.updatedAt) : null;
         }
 
-        generateId() {
-          return "stats_" + this.date;
+        _generateId() {
+          return `stats_${this.date}_${this.driverId || "global"}`;
         }
         updateFromTrip(trip) {
           this.totalEarnings += trip.amount;
@@ -756,27 +939,26 @@
           this.totalDistance += trip.distance;
           this.totalDuration += trip.duration;
           this.averageTrip = this.totalEarnings / this.tripCount;
-          this.fraudAlerts += trip.fraudAlerts.length;
-
-          // Compter par zone
+          this.fraudAlertsCount += trip.fraudAlerts.length;
           this.zones[trip.zone] = (this.zones[trip.zone] || 0) + 1;
-
-          this.updatedAt = new Date().toISOString();
+          this.updatedAt = new Date();
         }
         // Sérialisation pour stockage
         _serialize() {
           return {
             id: this.id,
+            driverId: this.driverId,
+            ownerId: this.ownerId,
             date: this.date,
             totalEarnings: this.totalEarnings,
             tripCount: this.tripCount,
             totalDistance: this.totalDistance,
             totalDuration: this.totalDuration,
             averageTrip: this.averageTrip,
-            fraudAlerts: this.fraudAlerts,
+            fraudAlertsCount: this.fraudAlertsCount,
             zones: this.zones,
-            createdAt: this.createdAt,
-            updatedAt: this.updatedAt,
+            createdAt: this.createdAt.toISOString(),
+            updatedAt: this.updatedAt ? this.updatedAt.toISOString() : null,
           };
         }
 
@@ -792,20 +974,22 @@
       // ===== INTERFACES REPOSITORY =====
 
       // Interface Repository générique
+      // ===== INTERFACES REPOSITORY =====
       class IRepository {
         async save(entity) {
           throw new Error("Not implemented");
         }
-        async findById(id) {
+        async findById(id, ownerId, driverId) {
           throw new Error("Not implemented");
         }
         async findAll(filters = {}) {
+          // filters peut inclure : { ownerId, driverId, date, status, etc. }
           throw new Error("Not implemented");
         }
-        async update(id, updates) {
+        async update(id, updates, ownerId, driverId) {
           throw new Error("Not implemented");
         }
-        async delete(id) {
+        async delete(id, ownerId, driverId) {
           throw new Error("Not implemented");
         }
         async count(filters = {}) {
@@ -815,12 +999,14 @@
       // ===== IMPLÉMENTATIONS LOCALSTORAGE =====
 
       // Repository Course
+      // ===== REPOSITORY : TRIP (LOCALSTORAGE) =====
       class TripRepository extends IRepository {
         constructor() {
           super();
           this.storageKey = "taxitracker_trips";
           this.initStorage();
         }
+
         initStorage() {
           if (!localStorage.getItem(this.storageKey)) {
             localStorage.setItem(this.storageKey, JSON.stringify([]));
@@ -829,29 +1015,29 @@
 
         async save(trip) {
           const trips = await this.findAll();
-          const tripEntity = trip instanceof Trip ? trip : new Trip(trip);
-
+          const tripEntity = trip instanceof Trip ? trip : Trip.fromJSON(trip);
           trips.push(tripEntity.toJSON());
           localStorage.setItem(this.storageKey, JSON.stringify(trips));
-          console.log("💾 Course sauvegardée:", tripEntity.id);
           return tripEntity;
         }
 
-        async findById(id) {
-          const trips = await this.findAll();
-          const tripData = trips.find((t) => t.id === id);
-          return tripData ? new Trip(tripData) : null;
+        async findById(id, ownerId, driverId) {
+          const trips = await this.findAll({ ownerId, driverId });
+          const data = trips.find((t) => t.id === id);
+          return data ? Trip.fromJSON(data) : null;
         }
+
         async findAll(filters = {}) {
           const trips = JSON.parse(
             localStorage.getItem(this.storageKey) || "[]"
           );
-
-          if (Object.keys(filters).length === 0) return trips;
-
           return trips.filter((trip) => {
+            if (filters.ownerId && trip.ownerId !== filters.ownerId)
+              return false;
+            if (filters.driverId && trip.driverId !== filters.driverId)
+              return false;
             if (filters.date) {
-              const tripDate = new Date(trip.createdAt).toDateString();
+              const tripDate = new Date(trip.startTime).toDateString();
               const filterDate = new Date(filters.date).toDateString();
               if (tripDate !== filterDate) return false;
             }
@@ -859,59 +1045,39 @@
             return true;
           });
         }
-        async update(id, updates) {
-          const trips = await this.findAll();
+
+        async update(id, updates, ownerId, driverId) {
+          const trips = await this.findAll({ ownerId, driverId });
           const index = trips.findIndex((t) => t.id === id);
-
-          if (index === -1) throw new Error(`Course ${id} non trouvée`);
-
+          if (index === -1)
+            throw new Error(`Trip ${id} not found for owner ${ownerId}`);
           trips[index] = {
             ...trips[index],
             ...updates,
             updatedAt: new Date().toISOString(),
           };
           localStorage.setItem(this.storageKey, JSON.stringify(trips));
-          return new Trip(trips[index]);
+          return Trip.fromJSON(trips[index]);
+        }
+
+        async delete(id, ownerId, driverId) {
+          const trips = await this.findAll({ ownerId, driverId });
+          const filtered = trips.filter((t) => t.id !== id);
+          localStorage.setItem(this.storageKey, JSON.stringify(filtered));
         }
 
         async count(filters = {}) {
           const trips = await this.findAll(filters);
           return trips.length;
         }
-        async exportCSV() {
-          const trips = await this.findAll();
-          if (!trips.length) return "Aucune course enregistrée";
-
-          const headers = [
-            "Date",
-            "Heure",
-            "Montant",
-            "Passagers",
-            "Distance",
-            "Durée",
-            "Zone",
-            "Statut",
-          ];
-          const rows = trips.map((trip) => [
-            new Date(trip.createdAt).toLocaleDateString("fr-FR"),
-            new Date(trip.createdAt).toLocaleTimeString("fr-FR"),
-            trip.amount + " FCFA",
-            trip.passengers,
-            (trip.distance || 0).toFixed(2) + " km",
-            Math.round((trip.duration || 0) / 60) + " min",
-            trip.zone,
-            trip.status,
-          ]);
-
-          return [headers, ...rows].map((row) => row.join(";")).join("\n");
-        }
       }
       // Repository GPS
-      class GPSRepository extends IRepository {
+      // ===== REPOSITORY : GPS POINT (LOCALSTORAGE) =====
+      class GPSPointRepository extends IRepository {
         constructor() {
           super();
-          this.storageKey = "taxitracker_gps";
-          this.maxPoints = 5000;
+          this.storageKey = "taxitracker_gps_points";
+          this.maxPoints = 10000; // limite globale
           this.initStorage();
         }
 
@@ -924,11 +1090,9 @@
         async save(point) {
           const points = await this.findAll();
           const pointEntity =
-            point instanceof GPSPoint ? point : new GPSPoint(point);
-
+            point instanceof GPSPoint ? point : GPSPoint.fromJSON(point);
           points.push(pointEntity.toJSON());
-
-          // Limiter le nombre de points
+          // Nettoyage si dépassement
           if (points.length > this.maxPoints) {
             points.splice(0, points.length - this.maxPoints);
           }
@@ -936,15 +1100,20 @@
           return pointEntity;
         }
 
+        async findByTripId(tripId, ownerId, driverId) {
+          return this.findAll({ tripId, ownerId, driverId });
+        }
+
         async findAll(filters = {}) {
           const points = JSON.parse(
             localStorage.getItem(this.storageKey) || "[]"
           );
-
-          if (Object.keys(filters).length === 0) return points;
-
           return points.filter((point) => {
             if (filters.tripId && point.tripId !== filters.tripId) return false;
+            if (filters.ownerId && point.ownerId !== filters.ownerId)
+              return false;
+            if (filters.driverId && point.driverId !== filters.driverId)
+              return false;
             if (filters.date) {
               const pointDate = new Date(point.timestamp).toDateString();
               const filterDate = new Date(filters.date).toDateString();
@@ -953,30 +1122,21 @@
             return true;
           });
         }
-        async findByTripId(tripId) {
-          return this.findAll({ tripId });
+
+        // Pas de update/delete pour les points GPS (immutable par design)
+        async update() {
+          throw new Error("GPSPoint is immutable");
         }
-
-        async clearOldPoints(daysToKeep = 30) {
-          const cutoffDate = new Date();
-          cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-
-          const points = await this.findAll();
-          const filteredPoints = points.filter(
-            (point) => new Date(point.timestamp) > cutoffDate
-          );
-
-          localStorage.setItem(this.storageKey, JSON.stringify(filteredPoints));
-          console.log(
-            `🧹 ${points.length - filteredPoints.length} points GPS supprimés`
-          );
+        async delete() {
+          throw new Error("GPSPoint is immutable");
         }
       }
       // Repository Statistiques
-      class StatsRepository extends IRepository {
+      // ===== REPOSITORY : DAILY STATS (LOCALSTORAGE) =====
+      class DailyStatsRepository extends IRepository {
         constructor() {
           super();
-          this.storageKey = "taxitracker_stats";
+          this.storageKey = "taxitracker_daily_stats";
           this.initStorage();
         }
 
@@ -985,53 +1145,116 @@
             localStorage.setItem(this.storageKey, JSON.stringify([]));
           }
         }
+
         async save(stats) {
           const allStats = await this.findAll();
           const statsEntity =
-            stats instanceof DailyStats ? stats : new DailyStats(stats);
-
-          // Remplacer si existe déjà pour cette date
+            stats instanceof DailyStats ? stats : DailyStats.fromJSON(stats);
+          // Remplacer si existe déjà pour (date + driverId)
           const existingIndex = allStats.findIndex(
-            (s) => s.date === statsEntity.date
+            (s) =>
+              s.date === statsEntity.date && s.driverId === statsEntity.driverId
           );
           if (existingIndex >= 0) {
             allStats[existingIndex] = statsEntity.toJSON();
           } else {
             allStats.push(statsEntity.toJSON());
           }
-
           localStorage.setItem(this.storageKey, JSON.stringify(allStats));
           return statsEntity;
         }
-        async findByDate(date) {
+
+        async findByDate(date, ownerId, driverId) {
           const dateStr =
             typeof date === "string" ? date : date.toISOString().split("T")[0];
-          const allStats = await this.findAll();
-          const statsData = allStats.find((s) => s.date === dateStr);
-          return statsData ? new DailyStats(statsData) : null;
+          const allStats = await this.findAll({ ownerId, driverId });
+          const data = allStats.find((s) => s.date === dateStr);
+          return data ? DailyStats.fromJSON(data) : null;
         }
 
-        async findAll() {
-          return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+        async findAll(filters = {}) {
+          const stats = JSON.parse(
+            localStorage.getItem(this.storageKey) || "[]"
+          );
+          return stats.filter((stat) => {
+            if (filters.ownerId && stat.ownerId !== filters.ownerId)
+              return false;
+            if (filters.driverId && stat.driverId !== filters.driverId)
+              return false;
+            if (filters.date) {
+              const statDate = stat.date;
+              const filterDate =
+                typeof filters.date === "string"
+                  ? filters.date
+                  : filters.date.toISOString().split("T")[0];
+              if (statDate !== filterDate) return false;
+            }
+            return true;
+          });
         }
 
-        async getOrCreateToday() {
+        async getOrCreateToday(ownerId, driverId) {
           const today = new Date().toISOString().split("T")[0];
-          let stats = await this.findByDate(today);
-
+          let stats = await this.findByDate(today, ownerId, driverId);
           if (!stats) {
-            stats = new DailyStats({ date: today });
+            stats = new DailyStats({ date: today, ownerId, driverId });
             await this.save(stats);
           }
-
           return stats;
+        }
+
+        // Pas de delete/update direct — on remplace via save()
+        async update() {
+          throw new Error("Use save() instead");
+        }
+        async delete() {
+          throw new Error("Stats are not deletable");
         }
       }
       // ===== INSTANCES GLOBALES =====
-      const tripRepository = new TripRepository();
-      const gpsRepository = new GPSRepository();
-      const statsRepository = new StatsRepository();
+      // ===== FACTORY : REPOSITORY FACTORY =====
+      class RepositoryFactory {
+        static createTripRepository(mode = "local") {
+          switch (mode) {
+            case "local":
+              return new TripRepository();
+            // case "firebase":
+            //   return new FirebaseTripRepository(); // À implémenter plus tard
+            default:
+              throw new Error(`Mode de repository non supporté: ${mode}`);
+          }
+        }
 
+        static createGPSRepository(mode = "local") {
+          switch (mode) {
+            case "local":
+              return new GPSPointRepository();
+            // case "firebase":
+            //   return new FirebaseGPSRepository();
+            default:
+              throw new Error(`Mode de repository non supporté: ${mode}`);
+          }
+        }
+
+        static createStatsRepository(mode = "local") {
+          switch (mode) {
+            case "local":
+              return new DailyStatsRepository();
+            // case "firebase":
+            //   return new FirebaseStatsRepository();
+            default:
+              throw new Error(`Mode de repository non supporté: ${mode}`);
+          }
+        }
+      }
+
+      // ===== MODE D'EXÉCUTION =====
+      const APP_MODE = "local"; // ← à modifier plus tard si besoin
+
+      // ===== INSTANCES GLOBALES VIA FACTORY =====
+      const tripRepository = RepositoryFactory.createTripRepository(APP_MODE);
+      const gpsRepository = RepositoryFactory.createGPSRepository(APP_MODE);
+      const statsRepository = RepositoryFactory.createStatsRepository(APP_MODE);
       // ===== SYSTÈME DE ZONES GÉOGRAPHIQUES =====
 
       // Définition des zones autorisées

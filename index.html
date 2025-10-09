@@ -2116,6 +2116,9 @@
               ? "bg-green-500 text-white"
               : "bg-yellow-500 text-black"
           );
+
+          setButtonState(declareTripBtn, true);
+          setButtonState(pauseBtn, true);
           // Resume periodic verification if day is on and not paused
           startPeriodicVerification();
         });

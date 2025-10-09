@@ -1149,7 +1149,9 @@
         async save(stats) {
           const allStats = await this.findAll();
           const statsEntity =
-            stats instanceof DailyStats ? stats : DailyStats.fromJSON(stats);
+            stats instanceof DailyStats
+              ? stats
+              : DailyStats._deserialize(stats);
           // Remplacer si existe déjà pour (date + driverId)
           const existingIndex = allStats.findIndex(
             (s) =>
@@ -1169,7 +1171,7 @@
             typeof date === "string" ? date : date.toISOString().split("T")[0];
           const allStats = await this.findAll({ ownerId, driverId });
           const data = allStats.find((s) => s.date === dateStr);
-          return data ? DailyStats.fromJSON(data) : null;
+          return data ? DailyStats._deserialize(data) : null;
         }
 
         async findAll(filters = {}) {
@@ -1197,7 +1199,11 @@
           const today = new Date().toISOString().split("T")[0];
           let stats = await this.findByDate(today, ownerId, driverId);
           if (!stats) {
-            stats = new DailyStats({ date: today, ownerId, driverId });
+            stats = new DailyStats({
+              date: today,
+              ownerId: ownerId,
+              driverId: driverId,
+            });
             await this.save(stats);
           }
           return stats;
@@ -1540,6 +1546,9 @@
         suspiciousEvents: [],
         lastSpeedCheck: null,
         trustScore: 100,
+        // Identifiants utilisateur
+        currentDriverId: "drv_mbemba_jean", // ← à remplacer dynamiquement
+        currentOwnerId: "own_taxi_123",
       };
 
       // ===== UTILITAIRES GPS =====
@@ -2231,6 +2240,8 @@
             startPosition: appState.currentPosition,
             startTime: appState.tripStartTime,
             status: "active",
+            driverId: appState.currentDriverId,
+            ownerId: appState.currentOwnerId,
           });
           appState.currentTrip.id = savedTrip.id;
           console.log("💾 Course sauvegardée:", savedTrip.id);
@@ -2292,17 +2303,39 @@
             }));
             // Mettre à jour la course dans la base
             const endPosInfo = getValidPositionWithFallback();
-            await tripRepository.update(appState.currentTrip.id, {
-              endPosition: endPosInfo.position,
-              endTime: Date.now(),
-              distance: finalDistance.toFixed(2),
-              duration: finalDuration * 60000,
-              zone: zone,
-              estimatedPrice: finalEstimatedPrice,
-              status: "completed",
-            });
+            await tripRepository.update(
+              appState.currentTrip.id,
+              {
+                endPosition: appState.currentPosition,
+                endTime: Date.now(),
+                distance: finalDistance.toFixed(2),
+                duration: finalDuration * 60000,
+                zone: zone,
+                estimatedPrice: finalEstimatedPrice,
+                status: "completed",
+              },
+              appState.currentOwnerId,
+              appState.currentDriverId
+            );
+            // Sauvegarder tous les points GPS de la course
+            for (const pt of appState.tripPoints) {
+              await gpsRepository.save({
+                lat: pt.lat,
+                lng: pt.lng,
+                accuracy: pt.accuracy,
+                speed: pt.speed,
+                heading: pt.heading,
+                tripId: appState.currentTrip.id,
+                driverId: appState.currentDriverId,
+                ownerId: appState.currentOwnerId,
+                timestamp: pt.ts || pt.timestamp,
+              });
+            }
             // Mettre à jour les statistiques quotidiennes
-            const todayStats = await statsRepository.getOrCreateToday();
+            const todayStats = await statsRepository.getOrCreateToday(
+              appState.currentOwnerId,
+              appState.currentDriverId
+            );
             todayStats.updateFromTrip({
               amount: appState.currentTrip.amount,
               distance: finalDistance.toFixed(2),
@@ -2532,7 +2565,10 @@
       // Charger et afficher l'historique
       async function loadTripHistory() {
         try {
-          const trips = await tripRepository.findAll();
+          const trips = await tripRepository.findAll({
+            ownerId: appState.currentOwnerId,
+            driverId: appState.currentDriverId,
+          });
           const completedTrips = trips.filter(
             (trip) => trip.status === "completed"
           );
@@ -2598,7 +2634,11 @@
       // Afficher les détails d'une course
       async function showTripDetails(tripId) {
         try {
-          const trip = await tripRepository.findById(tripId);
+          const trip = await tripRepository.findById(
+            tripId,
+            appState.currentOwnerId,
+            appState.currentDriverId
+          );
           if (!trip) {
             console.error("Course non trouvée:", tripId);
             return;

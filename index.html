@@ -1015,7 +1015,8 @@
 
         async save(trip) {
           const trips = await this.findAll();
-          const tripEntity = trip instanceof Trip ? trip : Trip.fromJSON(trip);
+          const tripEntity =
+            trip instanceof Trip ? trip : Trip._deserialize(trip);
           trips.push(tripEntity.toJSON());
           localStorage.setItem(this.storageKey, JSON.stringify(trips));
           return tripEntity;
@@ -1024,7 +1025,7 @@
         async findById(id, ownerId, driverId) {
           const trips = await this.findAll({ ownerId, driverId });
           const data = trips.find((t) => t.id === id);
-          return data ? Trip.fromJSON(data) : null;
+          return data ? Trip._deserialize(data) : null;
         }
 
         async findAll(filters = {}) {
@@ -1057,7 +1058,7 @@
             updatedAt: new Date().toISOString(),
           };
           localStorage.setItem(this.storageKey, JSON.stringify(trips));
-          return Trip.fromJSON(trips[index]);
+          return Trip._deserialize(trips[index]);
         }
 
         async delete(id, ownerId, driverId) {
@@ -1090,7 +1091,7 @@
         async save(point) {
           const points = await this.findAll();
           const pointEntity =
-            point instanceof GPSPoint ? point : GPSPoint.fromJSON(point);
+            point instanceof GPSPoint ? point : GPSPoint._deserialize(point);
           points.push(pointEntity.toJSON());
           // Nettoyage si dépassement
           if (points.length > this.maxPoints) {
@@ -2846,7 +2847,7 @@
                 color: "#3b82f6",
                 weight: 4,
                 opacity: 0.8,
-                dashArray: "5, 5",
+                smoothFactor: 1.0, // rend la ligne plus fluide
               }).addTo(map);
 
               // Optionnel : afficher des points intermédiaires (ex: toutes les 10s)

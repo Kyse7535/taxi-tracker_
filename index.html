@@ -1340,7 +1340,7 @@
         const current = appState.currentPosition;
         const lastValid = appState.lastValidPosition;
 
-        // Cas 1 : position actuelle valide
+        // Cas 1 : position actuelle valide (< 1000m)
         if (current && current.accuracy <= 1000) {
           return {
             position: { ...current },
@@ -2060,7 +2060,13 @@
             : "default";
           const finalEstimatedPrice = 0;
           try {
-            alert("distance: " + finalDistance.toFixed(2));
+            // Inclure tous les points GPS de la course
+            const tripPointsForStorage = appState.tripPoints.map((p) => ({
+              lat: p.lat,
+              lng: p.lng,
+              accuracy: p.accuracy,
+              timestamp: p.ts || p.timestamp,
+            }));
             // Mettre à jour la course dans la base
             const endPosInfo = getValidPositionWithFallback();
             await tripRepository.update(appState.currentTrip.id, {
@@ -2442,6 +2448,18 @@
           } else {
             alertsSection.style.display = "none";
           }
+
+          // S'assurer que trip.gpsPoints existe (sinon, fallback sur ligne droite)
+          if (!trip.gpsPoints || trip.gpsPoints.length < 2) {
+            // Essayer de reconstruire à partir de départ/arrivée
+            if (trip.startPosition && trip.endPosition) {
+              trip.gpsPoints = [trip.startPosition, trip.endPosition];
+            } else if (trip.startPosition) {
+              trip.gpsPoints = [trip.startPosition];
+            } else {
+              trip.gpsPoints = [];
+            }
+          }
           // Charger la carte
           await loadTripMap(trip);
 
@@ -2552,26 +2570,32 @@
           </div>
         `);
 
-              // Tracer la ligne de l'itinéraire
-              const routeLine = L.polyline(
-                [
-                  [trip.startPosition.lat, trip.startPosition.lng],
-                  [trip.endPosition.lat, trip.endPosition.lng],
-                ],
-                {
-                  color: "#3b82f6",
-                  weight: 4,
-                  opacity: 0.8,
-                  dashArray: "10, 5",
+              // Tracer l'itinéraire complet avec tous les points GPS
+              const fullRoute = trip.gpsPoints.map((point) => [
+                point.lat,
+                point.lng,
+              ]);
+              const routeLine = L.polyline(fullRoute, {
+                color: "#3b82f6",
+                weight: 4,
+                opacity: 0.8,
+                dashArray: "5, 5",
+              }).addTo(map);
+
+              // Optionnel : afficher des points intermédiaires (ex: toutes les 10s)
+              fullRoute.forEach((latlng, i) => {
+                if (i % 5 === 0) {
+                  L.circleMarker(latlng, { radius: 2, color: "#f59e0b" }).addTo(
+                    map
+                  );
                 }
-              ).addTo(map);
+              });
 
               // Ajuster la vue pour inclure tous les points
-              const group = new L.featureGroup([
-                startMarker,
-                endMarker,
-                routeLine,
-              ]);
+              const groupItems = [routeLine];
+              if (trip.startPosition) groupItems.push(startMarker);
+              if (trip.endPosition) groupItems.push(endMarker);
+              const group = new L.featureGroup(groupItems);
               map.fitBounds(group.getBounds().pad(0.1));
             } else {
               // Seulement le point de départ

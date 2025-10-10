@@ -910,6 +910,74 @@
         }
       }
 
+      // ===== ENTITÉ PLANNING DE TRAVAIL =====
+      class WorkSchedule {
+        constructor(data = {}) {
+          this.ownerId = data.ownerId || null;
+          this.driverId = data.driverId || null;
+          this.workStartHour = data.workStartHour || 8; // 8h
+          this.workEndHour = data.workEndHour || 20; // 20h
+          this.totalPauseMinutes = data.totalPauseMinutes || 120; // 2h
+          this.toleranceMinutes = data.toleranceMinutes || 30; // ±30 min
+          this.active = data.active !== false; // true par défaut
+          this.createdAt = data.createdAt
+            ? new Date(data.createdAt)
+            : new Date();
+          this.updatedAt = data.updatedAt ? new Date(data.updatedAt) : null;
+        }
+
+        toJSON() {
+          return {
+            ownerId: this.ownerId,
+            driverId: this.driverId,
+            workStartHour: this.workStartHour,
+            workEndHour: this.workEndHour,
+            totalPauseMinutes: this.totalPauseMinutes,
+            toleranceMinutes: this.toleranceMinutes,
+            active: this.active,
+            createdAt: this.createdAt.toISOString(),
+            updatedAt: this.updatedAt ? this.updatedAt.toISOString() : null,
+          };
+        }
+
+        static fromJSON(json) {
+          return json ? new WorkSchedule(json) : null;
+        }
+      }
+      // ===== ENTITÉ JOURNAL DE LA JOURNÉE =====
+      class DayLogEntry {
+        constructor(data = {}) {
+          this.id = data.id || this._generateId();
+          this.driverId = data.driverId || appState.currentDriverId;
+          this.ownerId = data.ownerId || appState.currentOwnerId;
+          this.type = data.type; // 'start_day', 'end_day', 'pause_start', 'pause_end', 'trip_start', 'trip_end', 'activity_check'
+          this.timestamp = data.timestamp
+            ? new Date(data.timestamp)
+            : new Date();
+          this.metadata = data.metadata || {};
+        }
+
+        _generateId() {
+          return `log_${Date.now().toString(36)}${Math.random()
+            .toString(36)
+            .substr(2, 5)}`;
+        }
+
+        toJSON() {
+          return {
+            id: this.id,
+            driverId: this.driverId,
+            ownerId: this.ownerId,
+            type: this.type,
+            timestamp: this.timestamp.toISOString(),
+            metadata: this.metadata,
+          };
+        }
+
+        static fromJSON(json) {
+          return json ? new DayLogEntry(json) : null;
+        }
+      }
       // Entité Statistiques
       class DailyStats {
         constructor(data = {}) {
@@ -1218,6 +1286,104 @@
           throw new Error("Stats are not deletable");
         }
       }
+
+      // ===== REPOSITORY : WORK SCHEDULE =====
+      class WorkScheduleRepository extends IRepository {
+        constructor() {
+          super();
+          this.storageKey = "taxitracker_work_schedule";
+          this.initStorage();
+        }
+
+        initStorage() {
+          if (!localStorage.getItem(this.storageKey)) {
+            localStorage.setItem(this.storageKey, JSON.stringify({}));
+          }
+        }
+
+        async save(schedule) {
+          const schedules = JSON.parse(
+            localStorage.getItem(this.storageKey) || "{}"
+          );
+          const key = `${schedule.ownerId}_${schedule.driverId}`;
+          schedules[key] = schedule.toJSON();
+          localStorage.setItem(this.storageKey, JSON.stringify(schedules));
+          return schedule;
+        }
+
+        async findByDriver(ownerId, driverId) {
+          const schedules = JSON.parse(
+            localStorage.getItem(this.storageKey) || "{}"
+          );
+          const key = `${ownerId}_${driverId}`;
+          const data = schedules[key];
+          return WorkSchedule.fromJSON(data);
+        }
+
+        // Pas de findAll, update, delete pour l’instant
+        async findAll() {
+          throw new Error("Not implemented");
+        }
+        async update() {
+          throw new Error("Not implemented");
+        }
+        async delete() {
+          throw new Error("Not implemented");
+        }
+      }
+      // ===== REPOSITORY : DAY LOG =====
+      class DayLogRepository extends IRepository {
+        constructor() {
+          super();
+          this.storageKey = "taxitracker_day_logs";
+          this.initStorage();
+        }
+
+        initStorage() {
+          if (!localStorage.getItem(this.storageKey)) {
+            localStorage.setItem(this.storageKey, JSON.stringify([]));
+          }
+        }
+
+        async save(log) {
+          const logs = await this.findAll();
+          const logEntity =
+            log instanceof DayLogEntry ? log : DayLogEntry.fromJSON(log);
+          logs.push(logEntity.toJSON());
+          localStorage.setItem(this.storageKey, JSON.stringify(logs));
+          return logEntity;
+        }
+
+        async findAll(filters = {}) {
+          const logs = JSON.parse(
+            localStorage.getItem(this.storageKey) || "[]"
+          );
+          return logs.filter((log) => {
+            if (filters.ownerId && log.ownerId !== filters.ownerId)
+              return false;
+            if (filters.driverId && log.driverId !== filters.driverId)
+              return false;
+            if (filters.date) {
+              const logDate = new Date(log.timestamp).toDateString();
+              const filterDate = new Date(filters.date).toDateString();
+              if (logDate !== filterDate) return false;
+            }
+            if (filters.type && log.type !== filters.type) return false;
+            return true;
+          });
+        }
+
+        // Pas de findById, update, delete pour l’instant
+        async findById() {
+          throw new Error("Not implemented");
+        }
+        async update() {
+          throw new Error("Not implemented");
+        }
+        async delete() {
+          throw new Error("Not implemented");
+        }
+      }
       // ===== INSTANCES GLOBALES =====
       // ===== FACTORY : REPOSITORY FACTORY =====
       class RepositoryFactory {
@@ -1253,6 +1419,22 @@
               throw new Error(`Mode de repository non supporté: ${mode}`);
           }
         }
+        static createDayLogRepository(mode = "local") {
+          switch (mode) {
+            case "local":
+              return new DayLogRepository();
+            default:
+              throw new Error(`Mode non supporté: ${mode}`);
+          }
+        }
+        static createWorkScheduleRepository(mode = "local") {
+          switch (mode) {
+            case "local":
+              return new WorkScheduleRepository();
+            default:
+              throw new Error(`Mode non supporté: ${mode}`);
+          }
+        }
       }
 
       // ===== MODE D'EXÉCUTION =====
@@ -1262,6 +1444,10 @@
       const tripRepository = RepositoryFactory.createTripRepository(APP_MODE);
       const gpsRepository = RepositoryFactory.createGPSRepository(APP_MODE);
       const statsRepository = RepositoryFactory.createStatsRepository(APP_MODE);
+      const workScheduleRepository =
+        RepositoryFactory.createWorkScheduleRepository(APP_MODE);
+      const dayLogRepository =
+        RepositoryFactory.createDayLogRepository(APP_MODE);
       // ===== SYSTÈME DE ZONES GÉOGRAPHIQUES =====
 
       // Définition des zones autorisées
@@ -1529,12 +1715,16 @@
       let appState = {
         dayStarted: false,
         paused: false,
+        pauseStartTime: null,
         currentTrip: null,
         tripStartTime: null,
         dailyEarnings: 12500,
         tripCount: 8,
         cameraStream: null,
         periodicTimerId: null,
+        currentSchedule: null,
+        scheduleDeviations: [],
+        lastActivityTime: null,
         // GPS Tracking State
         gpsWatchId: null,
         currentPosition: null,
@@ -1543,6 +1733,7 @@
         lastValidPosition: null,
         trackingActive: false,
         totalDistance: 0,
+        isOnline: navigator.onLine,
         // Fraud Detection
         suspiciousEvents: [],
         lastSpeedCheck: null,
@@ -1608,6 +1799,15 @@
         };
       }
 
+      // ===== JOURNALISATION DES ACTIONS =====
+      async function logDriverAction(type, metadata = {}) {
+        const log = new DayLogEntry({
+          type: type,
+          metadata: metadata,
+        });
+        await dayLogRepository.save(log);
+        console.log(`📝 Journal : ${type}`, log);
+      }
       // ===== SYSTÈME DE CARTE GPS =====
 
       // ===== SYSTÈME DE TRACKING SIMPLIFIÉ =====
@@ -1653,12 +1853,14 @@
         console.log("✅ WatchPosition lancé, ID:", appState.gpsWatchId);
 
         // Test timeout
+        // Ne pas marquer comme "désactivé" en offline — le GPS peut être lent
+        // Garder le statut "Démarrage..." pendant 30s max
         setTimeout(() => {
-          if (appState.positionBuffer.length === 0) {
-            console.log("⏳ Aucun point GPS reçu après 5s");
-            updateGPSStatus("En attente signal...", "text-yellow-400");
+          if (appState.positionBuffer.length === 0 && appState.trackingActive) {
+            updateGPSStatus("Recherche satellite...", "text-yellow-400");
+            // Continuer à écouter — ne pas arrêter
           }
-        }, 5000);
+        }, 30000); // 30 secondes, pas 5
 
         return true;
       }
@@ -1720,6 +1922,21 @@
         appState.currentPosition = point;
         appState.lastValidPosition = point;
 
+        // Calcul de vitesse manuel (offline-safe)
+        if (appState.lastValidPosition) {
+          const distanceM = calculateDistance(
+            appState.lastValidPosition.lat,
+            appState.lastValidPosition.lng,
+            point.lat,
+            point.lng
+          );
+          const timeDiffMs = point.ts - appState.lastValidPosition.ts;
+          if (timeDiffMs > 0) {
+            const speedMps = distanceM / (timeDiffMs / 1000); // m/s
+            point.speed = speedMps; // remplace position.coords.speed
+          }
+        }
+
         // Ajouter au buffer
         appState.positionBuffer.push(point);
 
@@ -1769,7 +1986,16 @@
             break;
         }
 
-        updateGPSStatus(message, "text-red-400");
+        // En offline, ce n’est pas une erreur fatale
+        if (
+          error.code === error.TIMEOUT ||
+          error.code === error.POSITION_UNAVAILABLE
+        ) {
+          updateGPSStatus("Signal faible", "text-yellow-400");
+          // Ne PAS arrêter le tracking — continue d’écouter
+        } else {
+          updateGPSStatus(message, "text-red-400");
+        }
         document.getElementById("gps-indicator").className =
           "w-3 h-3 bg-red-400 rounded-full";
       }
@@ -1847,6 +2073,17 @@
         console.warn("🚨 FRAUDE DÉTECTÉE:", message);
       }
 
+      // ===== JOURNAL DES ÉCARTS DE PLANNING =====
+      function logScheduleDeviation(type, details) {
+        const deviation = {
+          type: type, // 'early_start', 'late_end', 'inactive_during_hours', 'worked_outside_hours'
+          details: details,
+          timestamp: Date.now(),
+        };
+        appState.scheduleDeviations = appState.scheduleDeviations || [];
+        appState.scheduleDeviations.push(deviation);
+        console.log("📝 Écart planning :", type, details);
+      }
       // ===== INTERFACE UTILISATEUR =====
 
       // Mettre à jour affichage GPS
@@ -1989,6 +2226,22 @@
           }
 
           appState.dayStarted = true;
+          await logDriverAction("start_day", {
+            gpsPosition: appState.currentPosition,
+            timestamp: Date.now(),
+          });
+          // Vérifier respect du planning au démarrage
+          if (appState.currentSchedule?.active) {
+            const now = new Date();
+            if (!isWithinWorkHours(now, appState.currentSchedule)) {
+              const expectedStart = appState.currentSchedule.workStartHour;
+              logScheduleDeviation("early_start", {
+                actualTime: now.toLocaleTimeString(),
+                plannedStart: `${appState.currentSchedule.workStartHour}h`,
+                tolerance: appState.currentSchedule.toleranceMinutes,
+              });
+            }
+          }
           appState.paused = false;
           startDayBtn.textContent = "⏹️ Terminer la journée";
           startDayBtn.className =
@@ -2005,7 +2258,7 @@
         }
       });
 
-      function endDay() {
+      async function endDay() {
         // Stop any current trip
         if (appState.currentTrip) {
           if (
@@ -2025,7 +2278,25 @@
         // Arrêter GPS
         stopGPSTracking();
 
+        // Vérifier respect du planning à la fin
+        if (appState.currentSchedule?.active) {
+          const now = new Date();
+          if (!isWithinWorkHours(now, appState.currentSchedule)) {
+            const expectedEnd = appState.currentSchedule.workEndHour;
+            logScheduleDeviation("late_end", {
+              actualTime: now.toLocaleTimeString(),
+              plannedEnd: `${appState.currentSchedule.workEndHour}h`,
+              tolerance: appState.currentSchedule.toleranceMinutes,
+            });
+          }
+        }
+
         appState.dayStarted = false;
+        await logDriverAction("end_day", {
+          totalTrips: appState.tripCount,
+          totalEarnings: appState.dailyEarnings,
+          timestamp: Date.now(),
+        });
         appState.paused = false;
         startDayBtn.textContent = "▶️ Démarrer la journée";
         startDayBtn.className =
@@ -2047,18 +2318,26 @@
       }
 
       // Pause/Resume toggle
-      pauseBtn.addEventListener("click", () => {
+      pauseBtn.addEventListener("click", async () => {
         if (!appState.dayStarted) return;
 
         appState.paused = !appState.paused;
 
         if (appState.paused) {
+          await logDriverAction("pause_end", {
+            pauseDuration: Date.now() - (appState.pauseStartTime || Date.now()),
+            timestamp: Date.now(),
+          });
           pauseBtn.textContent = "▶️ Reprendre";
           updateStatusBadge("En pause", "bg-orange-500 text-white");
           setButtonState(declareTripBtn, false);
           stopPeriodicVerification();
         } else {
           pauseBtn.textContent = "⏸️ Pause";
+          appState.pauseStartTime = Date.now();
+          await logDriverAction("pause_start", {
+            timestamp: appState.pauseStartTime,
+          });
           updateStatusBadge("En service", "bg-green-500 text-white");
           setButtonState(declareTripBtn, true);
           startPeriodicVerification();
@@ -2234,6 +2513,14 @@
       async function startTrip() {
         appState.tripStartTime = Date.now();
 
+        await logDriverAction("trip_start", {
+          tripId: appState.currentTrip.id,
+          amount: appState.currentTrip.amount,
+          passengers: appState.currentTrip.passengers,
+          startPosition: appState.currentPosition,
+          timestamp: appState.tripStartTime,
+        });
+
         try {
           const savedTrip = await tripRepository.save({
             amount: appState.currentTrip.amount,
@@ -2259,6 +2546,7 @@
         currentTripCard.classList.remove("hidden");
         updateStatusBadge("En course", "bg-blue-500 text-white");
         startTripTimer();
+        appState.lastActivityTime = Date.now();
         // stopPeriodicVerification();
       }
       // Trip timer
@@ -2286,6 +2574,14 @@
           // Analyse finale de la course
           const finalDistance = calculateTripDistance();
           const finalDuration = (Date.now() - appState.tripStartTime) / 60000;
+
+          await logDriverAction("trip_end", {
+            tripId: appState.currentTrip.id,
+            distance: finalDistance.toFixed(2),
+            duration: finalDuration,
+            endPosition: appState.currentPosition,
+            timestamp: Date.now(),
+          });
 
           const zone = appState.currentPosition
             ? detectPricingZone(
@@ -2349,6 +2645,7 @@
             });
             await statsRepository.save(todayStats);
 
+            appState.lastActivityTime = Date.now();
             console.log("💾 Course terminée et sauvegardée");
           } catch (error) {
             console.error("❌ Erreur sauvegarde fin de course:", error);
@@ -2383,42 +2680,30 @@
 
       // Periodic verification when free
       function startPeriodicVerification() {
-        stopPeriodicVerification(); // ensure single timer
+        stopPeriodicVerification();
         if (!appState.dayStarted || appState.currentTrip || appState.paused)
           return;
 
-        appState.periodicTimerId = setTimeout(async () => {
-          if (!appState.dayStarted || appState.currentTrip || appState.paused) {
-            startPeriodicVerification();
-            return;
+        // Vérifier inactivité pendant les heures de travail
+        if (appState.currentSchedule?.active) {
+          const now = new Date();
+          if (isWithinWorkHours(now, appState.currentSchedule)) {
+            const lastActivity =
+              appState.lastActivityTime || appState.tripStartTime;
+            if (lastActivity && Date.now() - lastActivity > 2 * 60 * 1000) {
+              // 2 min
+              logScheduleDeviation("inactive_during_hours", {
+                lastActivity: new Date(
+                  appState.lastActivityTime
+                ).toLocaleTimeString(),
+                currentTime: new Date().toLocaleTimeString(),
+              });
+            }
           }
+        }
 
-          // Silent verification
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-            });
-
-            // Simulate detection
-            setTimeout(() => {
-              const detected = Math.random() > 0.9 ? 2 : 0; // 10% fraud chance
-
-              if (detected >= 2) {
-                addFraudAlert("Transport non déclaré détecté");
-              }
-
-              try {
-                stream.getTracks().forEach((track) => track.stop());
-              } catch {}
-              startPeriodicVerification(); // Continue cycle
-            }, 1000);
-          } catch (err) {
-            console.log("Periodic verification failed:", err);
-            startPeriodicVerification(); // Continue cycle
-          }
-        }, 8 * 60 * 1000); // 8 minutes
+        appState.periodicTimerId = setTimeout(startPeriodicVerification, 60000); // toutes les 1 min
       }
-
       function stopPeriodicVerification() {
         if (appState.periodicTimerId) {
           clearTimeout(appState.periodicTimerId);
@@ -2461,6 +2746,15 @@
       document.addEventListener("DOMContentLoaded", () => {
         console.log("🚀 TaxiTracker avec GPS chargé");
 
+        window.addEventListener("online", () => {
+          appState.isOnline = true;
+          console.log("🟢 Retour en ligne");
+        });
+        window.addEventListener("offline", () => {
+          appState.isOnline = false;
+          console.log("🔴 Mode offline — GPS seul");
+        });
+
         // Mettre à jour les statistiques quotidiennes
         async function updateDailyStats() {
           try {
@@ -2477,6 +2771,36 @@
             console.error("❌ Erreur stats:", error);
           }
         }
+
+        // Charger le planning de travail
+        async function loadWorkSchedule() {
+          try {
+            const schedule = await workScheduleRepository.findByDriver(
+              appState.currentOwnerId,
+              appState.currentDriverId
+            );
+            appState.currentSchedule = schedule;
+            console.log(
+              "📅 Planning chargé:",
+              schedule?.workStartHour,
+              "-",
+              schedule?.workEndHour
+            );
+          } catch (e) {
+            console.warn("⚠️ Pas de planning défini");
+          }
+        }
+        // Vérifier utilisation hors planning au chargement
+        if (appState.currentSchedule?.active) {
+          const now = new Date();
+          if (!isWithinWorkHours(now, appState.currentSchedule)) {
+            logScheduleDeviation("worked_outside_hours", {
+              time: now.toLocaleTimeString(),
+              plannedRange: `${appState.currentSchedule.workStartHour}h–${appState.currentSchedule.workEndHour}h`,
+            });
+          }
+        }
+        loadWorkSchedule();
 
         // Appeler au chargement
         updateDailyStats();
